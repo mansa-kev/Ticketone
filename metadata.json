@@ -1,0 +1,6 @@
+{
+  "name": "Ticketone",
+  "description": "Private advisory portal and secure payment portal for professionals and high net worth individuals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
