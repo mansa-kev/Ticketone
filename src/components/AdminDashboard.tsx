@@ -13,6 +13,7 @@ import {
   Info
 } from 'lucide-react';
 import { dbService, DBPayment, DBPaymentRequest, DBAdminNote } from '../lib/supabase';
+import { PaymentRequest } from '../types';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -27,8 +28,9 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
   
   // Data State
   const [payments, setPayments] = useState<DBPayment[]>([]);
-  const [requests, setRequests] = useState<DBPaymentRequest[]>([]);
+  const [requests, setRequests] = useState<PaymentRequest[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<DBPayment | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<PaymentRequest | null>(null);
   const [selectedPaymentNotes, setSelectedPaymentNotes] = useState<DBAdminNote[]>([]);
   const [newNoteText, setNewNoteText] = useState('');
   
@@ -48,9 +50,10 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [reqReference, setReqReference] = useState('');
   const [reqDescription, setReqDescription] = useState('');
   const [reqExpiry, setReqExpiry] = useState('');
-  const [generatedRequest, setGeneratedRequest] = useState<DBPaymentRequest | null>(null);
+  const [generatedRequest, setGeneratedRequest] = useState<PaymentRequest | null>(null);
   const [reqCopySuccess, setReqCopySuccess] = useState(false);
   const [markAsSentFlag, setMarkAsSentFlag] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Settings State
   const [settingsForm, setSettingsForm] = useState({
@@ -69,7 +72,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const loadDashboardData = async () => {
     try {
       const pData = await dbService.getPayments();
-      const rData = await dbService.getPaymentRequests();
+      const rData = await dbService.getNewPaymentRequests();
       setPayments(pData);
       setRequests(rData);
       
@@ -80,6 +83,14 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
           setSelectedPayment(refreshedSelected);
           const notes = await dbService.getNotes(refreshedSelected.id);
           setSelectedPaymentNotes(notes);
+        }
+      }
+
+      // Keep selected request in sync if detail panel is open
+      if (selectedRequest) {
+        const refreshedRequest = rData.find(item => item.id === selectedRequest.id);
+        if (refreshedRequest) {
+          setSelectedRequest(refreshedRequest);
         }
       }
     } catch (e) {
@@ -265,51 +276,48 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
     e.preventDefault();
     if (!reqClientName || !reqClientEmail || !reqAmount || !reqReference) return;
 
-    try {
-      const generated = await dbService.addPaymentRequest({
-        client_name: reqClientName,
-        client_email: reqClientEmail,
-        amount: parseFloat(reqAmount),
-        currency: reqCurrency,
-        reference: reqReference,
-        description: reqDescription || undefined,
-        status: 'unpaid',
-        expires_at: reqExpiry ? new Date(reqExpiry).toISOString() : undefined
-      });
+    setIsGenerating(true);
+    // Simulate high-security key generation handshake
+    setTimeout(async () => {
+      try {
+        const token = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : Math.random().toString(36).substring(2) + '-' + Math.random().toString(36).substring(2);
 
-      setGeneratedRequest(generated);
-      
-      // Auto-insert payment placeholder to payments list if status is ready for testing payment provider
-      await dbService.addPayment({
-        client_name: reqClientName,
-        client_email: reqClientEmail,
-        client_phone: '',
-        payment_reference: reqReference,
-        invoice_reference: reqReference,
-        amount: parseFloat(reqAmount),
-        currency: reqCurrency,
-        payment_provider: 'Ticketone Node Secure',
-        payment_status: 'pending',
-        settlement_status: 'awaiting settlement',
-        payment_method: 'Card Hold',
-        description: reqDescription || 'Advisory Fee Request'
-      });
+        const generated = await dbService.addNewPaymentRequest({
+          token,
+          clientName: reqClientName,
+          clientEmail: reqClientEmail,
+          amount: parseFloat(reqAmount),
+          currency: reqCurrency,
+          reference: reqReference,
+          description: reqDescription || '',
+          expiryDate: reqExpiry || undefined,
+          status: markAsSentFlag ? 'sent' : 'draft',
+        });
 
-      // Reload
-      await loadDashboardData();
+        setGeneratedRequest(generated);
+        
+        // Reload recent payment requests immediately
+        const rData = await dbService.getNewPaymentRequests();
+        setRequests(rData);
 
-      // Clear Form
-      setReqClientName('');
-      setReqClientEmail('');
-      setReqAmount('');
-      setReqReference('');
-      setReqDescription('');
-      setReqExpiry('');
+        // Clear Form
+        setReqClientName('');
+        setReqClientEmail('');
+        setReqAmount('');
+        setReqReference('');
+        setReqDescription('');
+        setReqExpiry('');
 
-    } catch (err) {
-      console.error("Error generating invoice request link:", err);
-    }
+      } catch (err) {
+        console.error("Error generating invoice request link:", err);
+      } finally {
+        setIsGenerating(false);
+      }
+    }, 750);
   };
+
 
   // Copy link helper
   const handleCopyLink = (link: string) => {
@@ -1106,17 +1114,20 @@ Restricted private corporate audit archive.
         )}
 
         {/* --------------------------------- PAGE 3: PAYMENT REQUESTS / LINKS --------------------------------- */}
-        {activeTab === 'requests' && !selectedPayment && (
+        {activeTab === 'requests' && !selectedPayment && !selectedRequest && (
           <div className="space-y-8">
             
             {/* Page Title */}
             <div>
               <span className="text-[10px] font-mono tracking-[0.25em] text-[#d9b08c] uppercase font-semibold block">
-                PAYMENT OUTBOUND PROTOCOL
+                PRIVATE ADVISORY HANDSHAKE CORE
               </span>
               <h1 className="font-serif text-3xl text-[#d1e8e2] font-light leading-snug mt-1">
-                Outbound Payment Requests
+                Advisory Payment Requests
               </h1>
+              <p className="text-xs text-cool-grey mt-1">
+                Create secure client payment links and monitor payment status.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -1125,10 +1136,10 @@ Restricted private corporate audit archive.
               <div className="lg:col-span-2 border border-white/[0.05] bg-[#090e15] p-6 rounded-xl space-y-6">
                 <div>
                   <h3 className="font-serif text-xl text-[#d1e8e2] font-light">
-                    Generate Request
+                    Create Payment Request
                   </h3>
                   <p className="text-[10px] font-mono text-[#d1e8e2]/55 uppercase tracking-wider mt-1">
-                    Ticketone secure payment key link generator
+                    Generate a private payment link for a client advisory engagement.
                   </p>
                 </div>
 
@@ -1136,7 +1147,7 @@ Restricted private corporate audit archive.
                   {/* Client Name */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-mono text-[#d1e8e2]/70 uppercase tracking-widest block font-medium">
-                      Client Legal Entity / Name
+                      Client Legal Name
                     </label>
                     <input
                       type="text"
@@ -1151,23 +1162,23 @@ Restricted private corporate audit archive.
                   {/* Client Email */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-mono text-[#d1e8e2]/70 uppercase tracking-widest block font-medium">
-                      Corporate/Safe Email Address
+                      Client Email Address
                     </label>
                     <input
                       type="email"
                       required
-                      placeholder="alistair@sterling-heritage.co.uk"
+                      placeholder="client@example.com"
                       value={reqClientEmail}
                       onChange={e => setReqClientEmail(e.target.value)}
                       className="w-full bg-[#2c3531]/40 border border-white/[0.08] focus:border-[#d9b08c]/50 rounded px-3 py-2 text-xs text-[#d1e8e2] focus:outline-none transition-all font-mono"
                     />
                   </div>
 
-                  {/* Amount and Currency */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="col-span-2 space-y-1.5">
+                  {/* Amount and Currency side-by-side */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
                       <label className="text-[10px] font-mono text-[#d1e8e2]/70 uppercase tracking-widest block font-medium">
-                        Retainer Amount
+                        Amount
                       </label>
                       <input
                         type="number"
@@ -1192,21 +1203,21 @@ Restricted private corporate audit archive.
                         <option value="USD">USD ($)</option>
                         <option value="EUR">EUR (€)</option>
                         <option value="GBP">GBP (£)</option>
-                        <option value="CHF">CHF (₣)</option>
+                        <option value="KES">KES (KSh)</option>
                       </select>
                     </div>
                   </div>
 
                   {/* Reference Number */}
                   <div className="space-y-1.5">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <label className="text-[10px] font-mono text-[#d1e8e2]/70 uppercase tracking-widest block font-medium">
                         Reference / Invoice No.
                       </label>
                       <button
                         type="button"
-                        onClick={() => setReqReference(`INV-2026-${Math.floor(100 + Math.random() * 900)}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`)}
-                        className="text-[9px] font-mono text-[#d9b08c] hover:underline"
+                        onClick={() => setReqReference(`TCK-2026-${String(Math.floor(1 + Math.random() * 9999)).padStart(4, '0')}`)}
+                        className="text-[9px] font-mono text-[#d9b08c] hover:underline cursor-pointer"
                       >
                         Auto-generate
                       </button>
@@ -1227,7 +1238,7 @@ Restricted private corporate audit archive.
                       Brief Advisory Description
                     </label>
                     <textarea
-                      placeholder="Advisory Milestone settlement fee..."
+                      placeholder="Advisory retainer fee..."
                       value={reqDescription}
                       onChange={e => setReqDescription(e.target.value)}
                       rows={2}
@@ -1257,7 +1268,7 @@ Restricted private corporate audit archive.
                       onChange={e => setMarkAsSentFlag(e.target.checked)}
                       className="rounded border-white/20 bg-[#2c3531] text-[#116466]"
                     />
-                    <label htmlFor="mark-sent-checkbox" className="text-[10px] font-mono text-[#d1e8e2]/80 uppercase">
+                    <label htmlFor="mark-sent-checkbox" className="text-[10px] font-mono text-[#d1e8e2]/80 uppercase select-none cursor-pointer">
                       Mark as sent immediately
                     </label>
                   </div>
@@ -1265,10 +1276,20 @@ Restricted private corporate audit archive.
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    className="w-full bg-[#d9b08c] hover:bg-[#cbb27a] text-[#2c3531] font-bold uppercase tracking-widest text-[11px] py-3.5 px-6 rounded transition-all cursor-pointer flex items-center justify-center gap-2 font-mono shadow-[0_4px_16px_rgba(184,155,94,0.15)]"
+                    disabled={isGenerating}
+                    className="w-full bg-[#d9b08c] hover:bg-[#cbb27a] text-[#2c3531] font-bold uppercase tracking-widest text-[11px] py-3.5 px-6 rounded transition-all cursor-pointer flex items-center justify-center gap-2 font-mono shadow-[0_4px_16px_rgba(184,155,94,0.15)] disabled:opacity-50"
                   >
-                    <LinkIcon className="h-3.5 w-3.5" />
-                    <span>Generate Secure Link</span>
+                    {isGenerating ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>Generating secure link...</span>
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="h-3.5 w-3.5" />
+                        <span>Generate Payment Link</span>
+                      </>
+                    )}
                   </button>
                 </form>
               </div>
@@ -1281,12 +1302,12 @@ Restricted private corporate audit archive.
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="p-5 border border-emerald-500/20 bg-[#1f8a5b]/10 rounded-xl space-y-4"
+                    className="p-5 border border-[#d9b08c]/20 bg-[#d9b08c]/5 rounded-xl space-y-4 text-[#d1e8e2]"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-emerald-400 font-mono text-[11px] uppercase tracking-wider font-bold">
+                      <div className="flex items-center gap-2 text-[#d9b08c] font-mono text-[11px] uppercase tracking-wider font-bold">
                         <CheckCircle className="h-4 w-4" />
-                        <span>Outbound Request Keys Encrypted</span>
+                        <span>Payment link created</span>
                       </div>
                       <button
                         onClick={() => setGeneratedRequest(null)}
@@ -1296,10 +1317,14 @@ Restricted private corporate audit archive.
                       </button>
                     </div>
 
-                    <div className="space-y-2 text-xs font-mono bg-[#2c3531]/60 p-4 rounded-lg">
-                      <p><span className="text-white/40">Invoice Reference:</span> <strong className="text-[#d9b08c]">{generatedRequest.reference}</strong></p>
-                      <p><span className="text-white/40">Client Entity:</span> <span className="text-[#d1e8e2]">{generatedRequest.client_name}</span></p>
-                      <p><span className="text-white/40">Required Sum:</span> <strong className="text-white">{generatedRequest.currency} {generatedRequest.amount.toLocaleString()}</strong></p>
+                    <p className="text-xs text-[#d1e8e2]/80">
+                      Send this secure link to the client to complete payment.
+                    </p>
+
+                    <div className="space-y-2 text-xs font-mono bg-[#2c3531]/40 p-4 rounded-lg">
+                      <p><span className="text-white/40">Reference:</span> <strong className="text-[#d9b08c]">{generatedRequest.reference}</strong></p>
+                      <p><span className="text-white/40">Client:</span> <span className="text-white font-medium">{generatedRequest.clientName}</span></p>
+                      <p><span className="text-white/40">Sum Required:</span> <strong className="text-[#d9b08c]">{generatedRequest.currency} {generatedRequest.amount.toLocaleString()}</strong></p>
                       
                       <div className="mt-4 pt-3.5 border-t border-white/[0.06] space-y-2">
                         <span className="text-[10px] text-white/50 block font-semibold uppercase tracking-wider">SECURE CLIENT WEB PAY LINK</span>
@@ -1307,14 +1332,31 @@ Restricted private corporate audit archive.
                           <input
                             type="text"
                             readOnly
-                            value={generatedRequest.payment_link}
-                            className="flex-1 bg-[#090e15] border border-white/[0.1] rounded px-2 py-1 text-[10.5px] text-emerald-300 font-mono focus:outline-none"
+                            value={generatedRequest.paymentLink}
+                            className="flex-1 bg-[#090e15] border border-white/[0.1] rounded px-2 py-1.5 text-[11px] text-emerald-300 font-mono focus:outline-none"
                           />
                           <button
-                            onClick={() => handleCopyLink(generatedRequest.payment_link)}
+                            onClick={() => handleCopyLink(generatedRequest.paymentLink)}
                             className="px-3 bg-[#d9b08c] text-charcoal-black hover:bg-[#cbb27a] rounded text-[10px] font-bold uppercase transition-all"
                           >
-                            {reqCopySuccess ? 'Copied' : 'Copy'}
+                            {reqCopySuccess ? 'Copied' : 'Copy Link'}
+                          </button>
+                          <a
+                            href={generatedRequest.paymentLink}
+                            target="_blank"
+                            referrerPolicy="no-referrer"
+                            className="px-3 bg-[#116466] hover:bg-[#116466]/85 text-white rounded text-[10px] font-bold uppercase transition-all flex items-center justify-center"
+                          >
+                            Open Link
+                          </a>
+                          <button
+                            onClick={() => {
+                              setSelectedRequest(generatedRequest);
+                              setGeneratedRequest(null);
+                            }}
+                            className="px-3 bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-white rounded text-[10px] font-bold uppercase transition-all"
+                          >
+                            View Request
                           </button>
                         </div>
                       </div>
@@ -1324,70 +1366,124 @@ Restricted private corporate audit archive.
 
                 {/* List of Outbound requests */}
                 <div className="border border-white/[0.05] bg-[#090e15] p-5 rounded-xl space-y-4">
-                  <h3 className="font-serif text-lg text-[#d1e8e2] font-light">
-                    Generated Outbound Logs
-                  </h3>
+                  <div>
+                    <h3 className="font-serif text-lg text-[#d1e8e2] font-light">
+                      Recent Payment Requests
+                    </h3>
+                    <p className="text-[10px] font-mono text-[#d1e8e2]/45 uppercase tracking-wider mt-0.5">
+                      Track generated links, client status, and payment outcomes.
+                    </p>
+                  </div>
 
                   <div className="divide-y divide-white/[0.04] space-y-3.5 max-h-[440px] overflow-y-auto pr-1">
-                    {requests.map(req => (
-                      <div key={req.id} className="pt-3.5 space-y-2 text-xs font-mono">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="font-serif text-[14px] font-medium text-[#d1e8e2] block">
-                              {req.client_name}
-                            </span>
-                            <span className="text-[10px] text-[#d1e8e2]/50 block mt-0.5">
-                              {req.reference} • {req.client_email}
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-xs font-bold text-[#d1e8e2] block">
-                              {req.currency} {req.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </span>
-                            <span className="text-[9px] text-[#d1e8e2]/40 block mt-0.5">
-                              Created {new Date(req.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/[0.02]">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-white/40">Status:</span>
-                            {req.status === 'paid' ? (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-[8px] text-emerald-400 font-bold uppercase">
-                                PAID
+                    {requests.length === 0 ? (
+                      <p className="text-xs text-cool-grey italic font-sans py-4">
+                        No payment requests registered.
+                      </p>
+                    ) : (
+                      requests.map(req => (
+                        <div key={req.id} className="pt-3.5 space-y-2 text-xs font-mono">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="font-serif text-[14px] font-medium text-[#d1e8e2] block">
+                                {req.clientName}
                               </span>
-                            ) : req.status === 'expired' ? (
-                              <span className="px-1.5 py-0.5 rounded bg-neutral-500/10 text-[8px] text-neutral-400 font-bold uppercase">
-                                EXPIRED
+                              <span className="text-[10px] text-[#d1e8e2]/50 block mt-0.5 font-mono">
+                                {req.reference} • {req.clientEmail}
                               </span>
-                            ) : (
-                              <span className="px-1.5 py-0.5 rounded bg-yellow-400/10 text-[8px] text-yellow-500 font-bold uppercase">
-                                UNPAID / SENT
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs font-bold text-[#d1e8e2] block">
+                                {req.currency} {req.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </span>
-                            )}
+                              <span className="text-[9px] text-[#d1e8e2]/40 block mt-0.5">
+                                Created {new Date(req.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleCopyLink(req.payment_link)}
-                              className="px-2.5 py-1 rounded border border-white/[0.05] hover:border-white/20 hover:bg-white/[0.03] text-[9px] text-[#d9b08c] uppercase font-bold cursor-pointer"
-                            >
-                              Copy Link
-                            </button>
-                            <a
-                              href={req.payment_link}
-                              target="_blank"
-                              referrerPolicy="no-referrer"
-                              className="p-1 rounded bg-[#116466] hover:bg-[#116466]/85 text-[#d1e8e2] cursor-pointer"
-                              title="Mock Payment checkout Screen"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/[0.02]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-white/40">Status:</span>
+                              {req.status === 'paid' && (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-[8px] text-emerald-400 font-bold uppercase">
+                                  PAID
+                                </span>
+                              )}
+                              {req.status === 'opened' && (
+                                <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-[8px] text-blue-400 font-bold uppercase">
+                                  OPENED
+                                </span>
+                              )}
+                              {req.status === 'sent' && (
+                                <span className="px-1.5 py-0.5 rounded bg-yellow-400/10 text-[8px] text-yellow-500 font-bold uppercase">
+                                  SENT
+                                </span>
+                              )}
+                              {req.status === 'draft' && (
+                                <span className="px-1.5 py-0.5 rounded bg-white/10 text-[8px] text-white font-bold uppercase">
+                                  DRAFT
+                                </span>
+                              )}
+                              {req.status === 'cancelled' && (
+                                <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-[8px] text-red-400 font-bold uppercase">
+                                  CANCELLED
+                                </span>
+                              )}
+                              {req.status === 'expired' && (
+                                <span className="px-1.5 py-0.5 rounded bg-neutral-500/10 text-[8px] text-neutral-400 font-bold uppercase">
+                                  EXPIRED
+                                </span>
+                              )}
+                              {req.status === 'unpaid' && (
+                                <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-[8px] text-yellow-500 font-bold uppercase">
+                                  UNPAID
+                                </span>
+                              )}
+                              {req.status === 'pending_payment' && (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[8px] text-amber-500 font-bold uppercase animate-pulse">
+                                  PENDING
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleCopyLink(req.paymentLink)}
+                                className="px-2 py-0.5 rounded border border-white/[0.05] hover:border-white/20 hover:bg-white/[0.03] text-[9px] text-[#d9b08c] uppercase font-bold cursor-pointer"
+                              >
+                                Copy Link
+                              </button>
+                              <a
+                                href={req.paymentLink}
+                                target="_blank"
+                                referrerPolicy="no-referrer"
+                                className="px-2 py-0.5 rounded bg-[#116466] hover:bg-[#116466]/85 text-[#d1e8e2] text-[9px] font-bold uppercase cursor-pointer"
+                              >
+                                Open
+                              </a>
+                              <button
+                                onClick={() => setSelectedRequest(req)}
+                                className="px-2 py-0.5 rounded border border-white/[0.05] hover:border-white/20 hover:bg-white/[0.03] text-[9px] text-[#d1e8e2] uppercase font-bold cursor-pointer"
+                              >
+                                View
+                              </button>
+                              {req.status !== 'cancelled' && (
+                                <button
+                                  onClick={async () => {
+                                    const updated = await dbService.updateNewRequestStatus(req.id, 'cancelled', { cancelledAt: new Date().toISOString() });
+                                    setRequests(updated);
+                                  }}
+                                  className="px-2 py-0.5 rounded border border-red-500/10 hover:bg-red-500/10 text-[9px] text-red-400 uppercase font-bold cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -1397,6 +1493,182 @@ Restricted private corporate audit archive.
 
           </div>
         )}
+
+        {/* ----------------- PAYMENT REQUEST DETAIL PAGE VIEW ----------------- */}
+        {activeTab === 'requests' && !selectedPayment && selectedRequest && (
+          <div className="space-y-6">
+            
+            {/* Back Row */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setSelectedRequest(null)}
+                className="flex items-center gap-2 text-xs font-mono uppercase text-[#d9b08c] hover:underline cursor-pointer"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back to recent payment requests</span>
+              </button>
+
+              <span className="text-[10px] font-mono text-white/35 uppercase">
+                REQUEST ID: {selectedRequest.id.substring(0, 8)}...
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              
+              {/* Left Col: Main Details Card */}
+              <div className="lg:col-span-2 border border-white/[0.05] bg-[#090e15] p-6 rounded-xl space-y-6">
+                
+                {/* Header detail */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b border-white/[0.04]">
+                  <div>
+                    <span className="text-[10px] font-mono tracking-widest text-[#d9b08c] uppercase block mb-1">
+                      Advisory Engagement Payment Request
+                    </span>
+                    <h2 className="font-serif text-2xl text-[#d1e8e2] font-light">
+                      {selectedRequest.clientName}
+                    </h2>
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="text-2xl font-serif text-white block">
+                      {selectedRequest.currency} {selectedRequest.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-cool-grey uppercase mt-1 inline-block">
+                      Status: <strong className="font-bold underline text-white">{selectedRequest.status.toUpperCase()}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Info Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-xs font-mono">
+                  <div className="space-y-1">
+                    <span className="text-white/40 block text-[9px] uppercase">Client Email</span>
+                    <span className="text-[#d1e8e2] block">{selectedRequest.clientEmail}</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-white/40 block text-[9px] uppercase">Reference / Invoice</span>
+                    <span className="text-[#d9b08c] font-bold block">{selectedRequest.reference}</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-white/40 block text-[9px] uppercase">Created At</span>
+                    <span className="text-[#d1e8e2] block">{new Date(selectedRequest.createdAt).toLocaleString()}</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-white/40 block text-[9px] uppercase">Expiry Date</span>
+                    <span className="text-[#d1e8e2] block">{selectedRequest.expiryDate ? new Date(selectedRequest.expiryDate).toLocaleDateString() : 'Never'}</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-white/40 block text-[9px] uppercase">Opened At</span>
+                    <span className="text-[#d1e8e2] block">{selectedRequest.openedAt ? new Date(selectedRequest.openedAt).toLocaleString() : 'Not Yet Opened'}</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-white/40 block text-[9px] uppercase">Paid At</span>
+                    <span className="text-emerald-400 block">{selectedRequest.paidAt ? new Date(selectedRequest.paidAt).toLocaleString() : 'Unpaid'}</span>
+                  </div>
+                </div>
+
+                {/* Secure Payment Link Box */}
+                <div className="p-4 bg-white/[0.02] border border-white/5 rounded-lg space-y-2">
+                  <span className="text-white/40 block text-[9px] uppercase">Secure Client Payment Link</span>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={selectedRequest.paymentLink}
+                      className="flex-1 bg-[#090e15] border border-white/[0.1] rounded px-3 py-2 text-xs text-emerald-300 font-mono focus:outline-none"
+                    />
+                    <button
+                      onClick={() => handleCopyLink(selectedRequest.paymentLink)}
+                      className="px-4 bg-[#d9b08c] text-charcoal-black hover:bg-[#cbb27a] rounded text-xs font-bold uppercase transition-all"
+                    >
+                      {reqCopySuccess ? 'Copied' : 'Copy'}
+                    </button>
+                    <a
+                      href={selectedRequest.paymentLink}
+                      target="_blank"
+                      referrerPolicy="no-referrer"
+                      className="px-4 bg-[#116466] hover:bg-[#116466]/85 text-white rounded text-xs font-bold uppercase transition-all flex items-center justify-center"
+                    >
+                      Open
+                    </a>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {selectedRequest.description && (
+                  <div className="p-4 bg-white/[0.02] border border-white/5 rounded-lg text-xs font-mono">
+                    <span className="text-white/40 block text-[9px] uppercase mb-1">Advisory Description</span>
+                    <p className="text-[#d1e8e2]/85 font-sans leading-relaxed">{selectedRequest.description}</p>
+                  </div>
+                )}
+
+                {/* Actions Row */}
+                <div className="pt-6 border-t border-white/[0.04] flex flex-wrap gap-3">
+                  <button
+                    onClick={() => handleCopyLink(selectedRequest.paymentLink)}
+                    className="px-4 py-2 bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.08] rounded text-xs font-mono uppercase tracking-wider text-white font-bold cursor-pointer transition-all"
+                  >
+                    Copy Link
+                  </button>
+                  <a
+                    href={selectedRequest.paymentLink}
+                    target="_blank"
+                    referrerPolicy="no-referrer"
+                    className="px-4 py-2 bg-[#116466] hover:bg-[#116466]/80 rounded text-xs font-mono uppercase tracking-wider text-white font-bold cursor-pointer transition-all flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Open Client Page</span>
+                  </a>
+                  {selectedRequest.status !== 'cancelled' && (
+                    <button
+                      onClick={async () => {
+                        const updated = await dbService.updateNewRequestStatus(selectedRequest.id, 'cancelled', { cancelledAt: new Date().toISOString() });
+                        setRequests(updated);
+                        const matched = updated.find(r => r.id === selectedRequest.id);
+                        if (matched) setSelectedRequest(matched);
+                      }}
+                      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded text-xs font-mono uppercase tracking-wider font-bold cursor-pointer transition-all"
+                    >
+                      Cancel Request
+                    </button>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Right Col: Back-office status guidelines */}
+              <div className="border border-white/[0.05] bg-[#090e15] p-6 rounded-xl space-y-4 text-xs font-mono">
+                <h3 className="font-serif text-lg text-[#d1e8e2] font-light">
+                  Request Operational Guidelines
+                </h3>
+                <p className="text-[10px] text-white/35 uppercase tracking-wider">
+                  Private Back-Office Advisory Procedure
+                </p>
+                <div className="space-y-3 pt-2 text-[#d1e8e2]/70 leading-relaxed font-sans">
+                  <p>
+                    <strong className="text-[#d9b08c] font-mono block text-[10px] uppercase mb-1">Status Transitions:</strong>
+                    Each generated advisory link is registered in private storage. When a client visits the link, its state automatically transitions to <span className="text-[#d9b08c] font-mono text-[10px]">OPENED</span>.
+                  </p>
+                  <p>
+                    <strong className="text-[#d9b08c] font-mono block text-[10px] uppercase mb-1">Strict Immutability:</strong>
+                    Once a link is generated, its reference number, amount, and currency are legally locked and cannot be edited by either party.
+                  </p>
+                  <p>
+                    <strong className="text-[#d9b08c] font-mono block text-[10px] uppercase mb-1">Cancellation Rule:</strong>
+                    If a link is cancelled, any further payment handshakes via the client page will be blocked by the Ticketone routing node.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
 
         {/* --------------------------------- PAGE 4: REPORTS --------------------------------- */}
         {activeTab === 'reports' && !selectedPayment && (

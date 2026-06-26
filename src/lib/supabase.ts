@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { Transaction, TransactionStatus } from '../types';
+import { Transaction, TransactionStatus, PaymentRequest } from '../types';
 
 // Environment variables for Supabase integration
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -20,6 +20,7 @@ export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
 const STORAGE_PAYMENTS_KEY = 'ticketone_db_payments_v2';
 const STORAGE_REQUESTS_KEY = 'ticketone_db_requests_v2';
 const STORAGE_NOTES_KEY = 'ticketone_db_notes_v2';
+const STORAGE_TICKETONE_REQUESTS_KEY = 'ticketone_payment_requests';
 
 export interface DBPayment {
   id: string;
@@ -223,6 +224,38 @@ const DEFAULT_REQUESTS: DBPaymentRequest[] = [
     expires_at: "2026-06-24T18:00:00Z",
     created_at: "2026-06-21T10:30:00Z",
     paid_at: "2026-06-22T12:15:00Z"
+  }
+];
+
+export const DEFAULT_NEW_REQUESTS: PaymentRequest[] = [
+  {
+    id: "req_new_1",
+    token: "e93ab7e2-127b-40f4-8c8f-9a1b80c39f1c",
+    clientName: "Count Philippe de Montaigne",
+    clientEmail: "montaigne@bordeauxadvisors.com",
+    amount: 45000,
+    currency: "EUR",
+    reference: "TCK-2026-0001",
+    description: "Structured Sovereign Bond Portfolios Placement Setup Fee",
+    paymentLink: `${window.location.origin}/pay/e93ab7e2-127b-40f4-8c8f-9a1b80c39f1c`,
+    status: "sent",
+    expiryDate: "2026-07-30",
+    createdAt: "2026-06-22T09:00:00Z"
+  },
+  {
+    id: "req_new_2",
+    token: "a84f32c9-635e-49b8-aa34-129b68c9832a",
+    clientName: "Elena Petrova",
+    clientEmail: "petrova@vienna-holdings.at",
+    amount: 15000,
+    currency: "EUR",
+    reference: "TCK-2026-0002",
+    description: "Vienna Real Estate Escrow Guarantee Advisory Retainer",
+    paymentLink: `${window.location.origin}/pay/a84f32c9-635e-49b8-aa34-129b68c9832a`,
+    status: "paid",
+    expiryDate: "2026-06-24",
+    createdAt: "2026-06-21T10:30:00Z",
+    paidAt: "2026-06-22T12:15:00Z"
   }
 ];
 
@@ -483,6 +516,71 @@ export const dbService = {
     await this.savePaymentRequests(updated);
     return updated;
   },
+
+  // --- NEW TICKETONE PAYMENT REQUESTS ---
+  async getNewPaymentRequests(): Promise<PaymentRequest[]> {
+    try {
+      const stored = localStorage.getItem(STORAGE_TICKETONE_REQUESTS_KEY);
+      if (!stored) {
+        localStorage.setItem(STORAGE_TICKETONE_REQUESTS_KEY, JSON.stringify(DEFAULT_NEW_REQUESTS));
+        return DEFAULT_NEW_REQUESTS;
+      }
+      return JSON.parse(stored);
+    } catch (e) {
+      console.warn("Failed to parse ticketone payment requests:", e);
+      return DEFAULT_NEW_REQUESTS;
+    }
+  },
+
+  async saveNewPaymentRequests(requests: PaymentRequest[]): Promise<void> {
+    try {
+      localStorage.setItem(STORAGE_TICKETONE_REQUESTS_KEY, JSON.stringify(requests));
+    } catch (e) {
+      console.warn("Failed to write ticketone payment requests:", e);
+    }
+  },
+
+  async addNewPaymentRequest(req: Omit<PaymentRequest, 'id' | 'paymentLink' | 'createdAt'>): Promise<PaymentRequest> {
+    const id = `req_${Math.floor(1000 + Math.random() * 9000)}`;
+    const link = `${window.location.origin}/pay/${req.token}`;
+    const newReq: PaymentRequest = {
+      ...req,
+      id,
+      paymentLink: link,
+      createdAt: new Date().toISOString()
+    };
+    const current = await this.getNewPaymentRequests();
+    current.unshift(newReq);
+    await this.saveNewPaymentRequests(current);
+    return newReq;
+  },
+
+  async updateNewRequestStatus(id: string, status: PaymentRequest['status'], extra?: Partial<PaymentRequest>): Promise<PaymentRequest[]> {
+    const current = await this.getNewPaymentRequests();
+    const updated = current.map(r => {
+      if (r.id === id || r.token === id) {
+        const payload: PaymentRequest = {
+          ...r,
+          status,
+          ...extra
+        };
+        if (status === 'paid' && !r.paidAt) {
+          payload.paidAt = new Date().toISOString();
+        }
+        if (status === 'opened' && !r.openedAt) {
+          payload.openedAt = new Date().toISOString();
+        }
+        if (status === 'cancelled' && !r.cancelledAt) {
+          payload.cancelledAt = new Date().toISOString();
+        }
+        return payload;
+      }
+      return r;
+    });
+    await this.saveNewPaymentRequests(updated);
+    return updated;
+  },
+
 
   // --- ADMIN NOTES ---
   async getNotes(paymentId: string): Promise<DBAdminNote[]> {

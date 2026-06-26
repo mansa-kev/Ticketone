@@ -26,3 +26,21 @@ export interface DashboardStats {
   refundedCount: number;
   averageAmount: number;
 }
+
+export interface PaymentRequest {
+  id: string;
+  token: string;
+  clientName: string;
+  clientEmail: string;
+  amount: number;
+  currency: string;
+  reference: string;
+  description: string;
+  expiryDate?: string;
+  status: "draft" | "sent" | "opened" | "unpaid" | "pending_payment" | "paid" | "failed" | "expired" | "cancelled";
+  paymentLink: string;
+  createdAt: string;
+  openedAt?: string;
+  paidAt?: string;
+  cancelledAt?: string;
+}

@@ -14,6 +14,7 @@ import AdminDashboard from './components/AdminDashboard';
 import LegalPages from './components/LegalPages';
 import Footer from './components/Footer';
 import SandboxCheckout from './components/SandboxCheckout';
+import ClientPay from './components/ClientPay';
 import { Transaction } from './types';
 import { dbService, DBPaymentRequest } from './lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,6 +26,7 @@ export default function App() {
   const [lastCompletedTransaction, setLastCompletedTransaction] = useState<Transaction | null>(null);
   const [presetRequest, setPresetRequest] = useState<DBPaymentRequest | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [clientPayToken, setClientPayToken] = useState<string | null>(null);
 
   // References for layout elements
   const paymentSectionRef = useRef<HTMLDivElement>(null);
@@ -44,6 +46,15 @@ export default function App() {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
     const refParam = params.get('ref') || params.get('txId');
+
+    if (path.startsWith('/pay/')) {
+      const token = path.substring(5);
+      if (token) {
+        setClientPayToken(token);
+        setCurrentView('client-pay');
+        return;
+      }
+    }
 
     if (path === '/checkout/sandbox') {
       setCurrentView('checkout-sandbox');
@@ -261,6 +272,11 @@ export default function App() {
             {/* 7. CHECKOUT SANDBOX */}
             {currentView === 'checkout-sandbox' && (
               <SandboxCheckout />
+            )}
+
+            {/* 7b. CLIENT-FACING ADVISORY PAYMENT VIEW */}
+            {currentView === 'client-pay' && clientPayToken && (
+              <ClientPay token={clientPayToken} />
             )}
 
             {/* 8. PAYMENT FAILED / CANCELLED VIEW */}
