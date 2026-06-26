@@ -299,10 +299,10 @@ export default function App() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-green opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-success-green"></span>
             </span>
-            <span>TICKETONE SYSTEM ACTIVE : LOCAL SECURE CACHE ON</span>
+            <span>PRIVATE ADVISORY PORTAL ACTIVE</span>
           </div>
           <div>
-            <span>SYSTEM ENCLAVE INDEX PROTOCOL v6.20 • STABLE SESSIONS</span>
+            <span>SECURE 256-BIT ENCRYPTION ACTIVE</span>
           </div>
         </div>
       </div>

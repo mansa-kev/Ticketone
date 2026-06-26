@@ -157,13 +157,13 @@ export default function LegalPages() {
                   Retainer &amp; Settlement Policy
                 </h3>
                 <p className="text-[10px] font-mono text-cool-grey tracking-wider uppercase mt-1">
-                  PCI STABLE SETTLEMENT &amp; LIQUIDITY ROUTING RULE
+                  SECURE PAYMENT SETTLEMENT &amp; ROUTING PROTOCOL
                 </p>
               </div>
             </div>
 
             <p className="font-serif text-lg text-softivory italic leading-normal">
-              This policy explains the guidelines regulating payment processing, currencies supported, and our internal USDT settlement mechanism.
+              This policy explains the guidelines regulating payment processing, currencies supported, and our internal payment settlement mechanism.
             </p>
 
             <div className="space-y-4">
@@ -174,9 +174,9 @@ export default function LegalPages() {
             </div>
 
             <div className="space-y-4">
-              <h4 className="font-serif text-lg text-muted-gold font-medium">2. USDT Settlement Mechanism</h4>
+              <h4 className="font-serif text-lg text-muted-gold font-medium">2. Secure Settlement Processing</h4>
               <p className="text-cool-grey text-xs sm:text-sm">
-                We operate a premium high-trust backend where card proceeds are automatically converted and settled into stable, secure USDT assets. This secures funds from regional banking volatility, ensuring prompt and highly fluid treasury settlement for our clients. No crypto jargon exists on public invoice paths to preserve discretion.
+                We operate a premium, secure backend where card proceeds are processed and settled directly to secure institutional vaults. This protects funds from volatility, ensuring prompt and highly fluid treasury settlement for our clients. Every transaction is processed through encrypted financial paths to preserve client discretion.
               </p>
             </div>
 

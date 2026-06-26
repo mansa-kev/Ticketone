@@ -33,7 +33,7 @@ export default function Footer({ onNavigate }: FooterProps) {
 
         {/* Col 2: Legal and Policies links */}
         <div className="flex flex-col items-center justify-center space-y-2 text-xs font-mono">
-          <span className="text-[10px] text-cool-grey/40 uppercase tracking-widest">REGULATORY INDEX</span>
+          <span className="text-[10px] text-cool-grey/40 uppercase tracking-widest">INFORMATION</span>
           <div className="flex items-center gap-4 text-cool-grey/85">
             <button 
               id="footer-terms-btn"
@@ -62,13 +62,13 @@ export default function Footer({ onNavigate }: FooterProps) {
           
           <div className="pt-2 flex items-center gap-1 text-[10px] text-cool-grey/45">
             <ShieldCheck className="h-3.5 w-3.5 text-muted-gold/70" />
-            <span>Fully Compliant Secure payment Host</span>
+            <span>Secure Corporate Payments</span>
           </div>
         </div>
 
         {/* Col 3: Contact and Copyright */}
         <div className="flex flex-col items-center md:items-end justify-center space-y-2.5">
-          <span className="text-[10px] font-mono text-cool-grey/40 uppercase tracking-widest">COMMUNICATION SHELL</span>
+          <span className="text-[10px] font-mono text-cool-grey/40 uppercase tracking-widest">CONTACT</span>
           
           <a 
             href="mailto:advisory@ticketone.ch" 
@@ -80,7 +80,7 @@ export default function Footer({ onNavigate }: FooterProps) {
 
           <div className="text-[11px] text-cool-grey/50 font-mono text-center md:text-right mt-2">
             <span>© 2018–2026 Ticketone. All rights reserved.</span> <br />
-            <span className="text-[9px] uppercase tracking-widest opacity-60">Confidential Clearing Enclave CH-8002</span>
+            <span className="text-[9px] uppercase tracking-widest opacity-60">Geneva, Switzerland</span>
           </div>
         </div>
 

@@ -1,11 +1,6 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { CheckCircle2, ShieldCheck, Mail, Calendar, Hash, FileCheck, ArrowRight, Printer } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Mail, Calendar, Hash, Printer, ArrowRight, Clock, RefreshCw } from 'lucide-react';
 import { Transaction } from '../types';
 
 interface ConfirmationViewProps {
@@ -14,6 +9,11 @@ interface ConfirmationViewProps {
 }
 
 export default function ConfirmationView({ transaction, onReset }: ConfirmationViewProps) {
+  const [localStatus, setLocalStatus] = useState<'pending' | 'paid' | 'failed'>(
+    transaction.status || 'pending'
+  );
+  const [checkingStatus, setCheckingStatus] = useState(false);
+
   const currencySymbols: Record<string, string> = {
     USD: '$',
     EUR: '€',
@@ -42,6 +42,28 @@ export default function ConfirmationView({ transaction, onReset }: ConfirmationV
     }
   };
 
+  const handleRefreshStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const res = await fetch(`/api/payments/status/${transaction.reference}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.payment) {
+          const status = data.payment.payment_status === 'paid' ? 'paid' : 'pending';
+          setLocalStatus(status as any);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to verify payment status update:', err);
+    } finally {
+      setTimeout(() => {
+        setCheckingStatus(false);
+      }, 800);
+    }
+  };
+
+  const isPaid = localStatus === 'paid';
+
   return (
     <section className="py-12 md:py-20 px-6 max-w-2xl mx-auto" id="payment-confirmation-view">
       <motion.div 
@@ -50,28 +72,36 @@ export default function ConfirmationView({ transaction, onReset }: ConfirmationV
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="border border-white/[0.08] bg-charcoal-black rounded-xl overflow-hidden shadow-[0_25px_60px_rgba(0,0,0,0.5)] print:border-black print:bg-white print:text-black print:shadow-none"
       >
-        {/* Decorative Gold Header Ribbon */}
+        {/* Gold Ribbon for Premium Design Feel */}
         <div className="h-[4px] bg-gradient-to-r from-muted-gold/20 via-muted-gold to-muted-gold/20 print:hidden" />
 
-        {/* Brand/Status banner */}
+        {/* Brand & Status Banner */}
         <div className="p-8 pb-4 text-center">
-          <div className="inline-flex items-center justify-center p-3 rounded-full bg-success-green/10 border border-success-green/20 mb-4 print:hidden">
-            <CheckCircle2 className="h-8 w-8 text-success-green animate-pulse" />
-          </div>
+          {isPaid ? (
+            <div className="inline-flex items-center justify-center p-3 rounded-full bg-success-green/10 border border-success-green/20 mb-4 print:hidden">
+              <CheckCircle2 className="h-8 w-8 text-success-green animate-pulse" />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center p-3 rounded-full bg-amber-500/10 border border-amber-500/20 mb-4 print:hidden">
+              <Clock className="h-8 w-8 text-amber-500 animate-pulse" />
+            </div>
+          )}
           
           <h2 className="font-serif text-3xl text-softivory font-light tracking-wide print:text-black">
-            Payment Securely Received
+            {isPaid ? 'Payment Securely Received' : 'Payment Confirmation Pending'}
           </h2>
           <p className="text-xs text-muted-gold font-mono tracking-widest uppercase mt-2">
             Ticketone Confidential Advisory Portal
           </p>
         </div>
 
-        {/* Suggested copy from customer guidelines */}
+        {/* Dynamic Context Header text */}
         <div className="px-8 py-4 text-center border-y border-white/[0.04] bg-primary-navy/20 print:bg-transparent print:border-black/10">
           <p className="text-sm text-cool-grey leading-relaxed max-w-md mx-auto print:text-black/85">
-            Thank you. Your payment has been received and your transaction is being processed. 
-            A confirmation record has been sent to the provided email address.
+            {isPaid 
+              ? 'Thank you. Your payment has been received and verified. A confirmation record has been saved and sent to your email.'
+              : 'Thank you. Your secure transaction is currently awaiting confirmation from our global payment partner. Use the status control below to refresh.'
+            }
           </p>
         </div>
 
@@ -82,7 +112,7 @@ export default function ConfirmationView({ transaction, onReset }: ConfirmationV
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-sm">
-            {/* Client name */}
+            {/* Client Account */}
             <div className="flex flex-col">
               <span className="text-[10px] font-mono uppercase text-cool-grey/60">Client Account</span>
               <span className="font-medium text-softivory mt-1 font-serif text-base print:text-black">{transaction.clientName}</span>
@@ -94,7 +124,7 @@ export default function ConfirmationView({ transaction, onReset }: ConfirmationV
               <span className="font-mono text-xs text-softivory mt-1 print:text-black">{transaction.email}</span>
             </div>
 
-            {/* Invoice Ref */}
+            {/* Invoice Reference */}
             <div className="flex flex-col">
               <span className="text-[10px] font-mono uppercase text-cool-grey/60 flex items-center gap-1">
                 <Hash className="h-3 w-3 text-muted-gold" />
@@ -103,7 +133,7 @@ export default function ConfirmationView({ transaction, onReset }: ConfirmationV
               <span className="font-mono text-xs text-softivory mt-1 font-semibold print:text-black">{transaction.reference}</span>
             </div>
 
-            {/* Date and Time */}
+            {/* Submission Date */}
             <div className="flex flex-col">
               <span className="text-[10px] font-mono uppercase text-cool-grey/60 flex items-center gap-1">
                 <Calendar className="h-3 w-3 text-muted-gold" />
@@ -112,52 +142,75 @@ export default function ConfirmationView({ transaction, onReset }: ConfirmationV
               <span className="font-mono text-[11px] text-softivory mt-1 leading-normal print:text-black">{formattedDate}</span>
             </div>
 
-            {/* Transaction UUID */}
+            {/* Gateway Reference ID */}
             <div className="flex flex-col">
-              <span className="text-[10px] font-mono uppercase text-cool-grey/60">Ledger Index ID</span>
+              <span className="text-[10px] font-mono uppercase text-cool-grey/60">Gateway Reference ID</span>
               <span className="font-mono text-xs text-cool-grey mt-1 print:text-black">{transaction.id}</span>
             </div>
 
-            {/* Settlement USDT wallet mode info */}
+            {/* Secure Clearance Mode */}
             <div className="flex flex-col">
-              <span className="text-[10px] font-mono uppercase text-cool-grey/60">Settlement Security</span>
-              <span className="font-mono text-[11px] text-success-green mt-1 font-medium">Automatic USDT Cleared</span>
+              <span className="text-[10px] font-mono uppercase text-cool-grey/60">Clearance Status</span>
+              {isPaid ? (
+                <span className="font-mono text-[11px] text-success-green mt-1 font-medium">Card Settlement Completed</span>
+              ) : (
+                <span className="font-mono text-[11px] text-amber-400 mt-1 font-medium animate-pulse">Awaiting Partner Clearance</span>
+              )}
             </div>
           </div>
 
-          {/* Amount Large Display */}
+          {/* Amount Display */}
           <div className="mt-8 border border-white/[0.06] bg-[#0c1015] p-5 rounded-lg flex items-center justify-between print:border-black/15 print:bg-transparent">
             <div>
-              <span className="text-[10px] font-mono uppercase text-cool-grey/50 block">NET ADVISORY FEE PAID</span>
+              <span className="text-[10px] font-mono uppercase text-cool-grey/50 block">ADVISORY FEE AMOUNT</span>
               <span className="text-xl text-softivory font-serif tracking-wide print:text-black">Professional Consulting Services</span>
             </div>
             <div className="text-right">
-              <span className="text-xs text-muted-gold font-mono font-semibold block uppercase">SETTLED</span>
+              <span className="text-xs text-muted-gold font-mono font-semibold block uppercase">
+                {isPaid ? 'SETTLED' : 'PENDING'}
+              </span>
               <span className="font-mono text-2xl font-bold text-softivory tracking-tight print:text-black">
                 {currencySymbols[transaction.currency]} {transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
 
-          {/* Verification Status */}
+          {/* Verification Box */}
           <div className="flex items-start gap-3 p-4 bg-white/[0.01] border border-white/[0.04] rounded text-xs text-cool-grey font-light print:hidden">
             <ShieldCheck className="h-4.5 w-4.5 text-muted-gold shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <p className="font-medium text-softivory">Vault Verification Active</p>
+              <p className="font-medium text-softivory">Secure Vault Verification</p>
               <p className="leading-relaxed text-[11px] text-cool-grey/70">
-                This receipt acts as executive proof of billing. The funds have been locked and integrated into Ticketone's private secure ledger system.
+                This receipt acts as professional proof of payment. Your transaction is processed through secure, encrypted pathways to preserve client discretion.
               </p>
             </div>
           </div>
 
-          {/* Support line */}
+          {/* Refresh Action for Pending State */}
+          {!isPaid && (
+            <div className="pt-2 flex flex-col items-center justify-center space-y-2 print:hidden border-t border-white/[0.04]">
+              <button
+                onClick={handleRefreshStatus}
+                disabled={checkingStatus}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-mono rounded text-softivory hover:text-white transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`h-3 w-3 text-muted-gold ${checkingStatus ? 'animate-spin' : ''}`} />
+                <span>{checkingStatus ? 'Querying Clearing House...' : 'Check Clearance Status'}</span>
+              </button>
+              <p className="text-[10px] text-cool-grey/40 text-center leading-relaxed">
+                Queries the designated gateway directly to verify your transaction status in real-time.
+              </p>
+            </div>
+          )}
+
+          {/* Support Line */}
           <div className="text-center pt-2 text-[11px] text-cool-grey/60 font-mono flex items-center justify-center gap-1.5 print:text-black/80">
             <Mail className="h-3.5 w-3.5 text-muted-gold" />
             <span>Support inquiry: </span>
             <a href="mailto:support@ticketone.advisory" className="text-muted-gold hover:underline font-semibold pr-1">support@ticketone.advisory</a>
           </div>
 
-          {/* Action buttons */}
+          {/* Footer controls */}
           <div className="pt-6 flex flex-col sm:flex-row gap-4 justify-between items-center print:hidden">
             <button
               onClick={handlePrintReceipt}

@@ -50,7 +50,7 @@ export default function Positioning() {
                 </div>
                 <div className="flex items-center gap-2.5">
                   <CheckCircle className="h-4 w-4 text-muted-gold shrink-0" />
-                  <span className="text-xs text-cool-grey tracking-wide uppercase font-mono">Instant USDT Settlement</span>
+                  <span className="text-xs text-cool-grey tracking-wide uppercase font-mono">Instant Secure Clearance</span>
                 </div>
               </div>
             </div>

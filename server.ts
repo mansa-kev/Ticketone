@@ -269,12 +269,17 @@ app.post('/api/payments/create', async (req, res) => {
   const store = getStore();
 
   // Check for duplicate payment references
-  const duplicate = store.payments.find(p => p.internal_reference.toLowerCase() === payment_reference.toLowerCase());
-  if (duplicate) {
-    return res.status(409).json({ error: 'Invoice reference index conflict detected.' });
+  const duplicateIndex = store.payments.findIndex(p => p.internal_reference.toLowerCase() === payment_reference.toLowerCase());
+  if (duplicateIndex !== -1) {
+    const duplicate = store.payments[duplicateIndex];
+    if (duplicate.payment_status === 'paid') {
+      return res.status(409).json({ error: 'Invoice reference index conflict detected.' });
+    }
   }
 
-  const txId = `TX-${Math.floor(10000 + Math.random() * 90000)}-${client_name.substring(0, 2).toUpperCase()}`;
+  const isUpdate = duplicateIndex !== -1;
+  const existingPayment = isUpdate ? store.payments[duplicateIndex] : null;
+  const txId = existingPayment ? existingPayment.id : `TX-${Math.floor(10000 + Math.random() * 90000)}-${client_name.substring(0, 2).toUpperCase()}`;
   const now = new Date().toISOString();
 
   // Load the selected dynamic provider via abstraction layer
@@ -322,11 +327,15 @@ app.post('/api/payments/create', async (req, res) => {
       settlement_network: process.env.DEFAULT_SETTLEMENT_NETWORK || '',
       settlement_label: process.env.DEFAULT_SETTLEMENT_ADDRESS_LABEL || 'Binance USDT Wallet',
       settlement_address: process.env.DEFAULT_SETTLEMENT_ADDRESS || '',
-      created_at: now,
+      created_at: existingPayment ? existingPayment.created_at : now,
       updated_at: now
     };
 
-    store.payments.unshift(newPayment);
+    if (isUpdate) {
+      store.payments[duplicateIndex] = newPayment;
+    } else {
+      store.payments.unshift(newPayment);
+    }
     
     // Update matching payment request to pending
     const reqIndex = store.requests.findIndex(r => r.reference.toLowerCase() === payment_reference.toLowerCase());
@@ -355,17 +364,58 @@ app.post('/api/payments/create', async (req, res) => {
 });
 
 // 2. Query Payment Status
-app.get('/api/payments/status/:paymentId', (req, res) => {
+app.get('/api/payments/status/:paymentId', async (req, res) => {
   const { paymentId } = req.params;
   const store = getStore();
-  const payment = store.payments.find(p => 
+  const paymentIndex = store.payments.findIndex(p => 
     p.id === paymentId || 
     p.internal_reference.toLowerCase() === paymentId.toLowerCase() ||
     p.provider_payment_id === paymentId
   );
 
-  if (!payment) {
+  if (paymentIndex === -1) {
     return res.status(404).json({ error: 'Payment index not found.' });
+  }
+
+  const payment = store.payments[paymentIndex];
+
+  // Dynamically verify status with active provider if currently pending and has a provider ID
+  if (payment.payment_status === 'pending' && payment.provider_payment_id && !payment.provider_payment_id.startsWith('now_sandbox_') && !payment.provider_payment_id.startsWith('stripe_sandbox_')) {
+    const provider = getActiveProvider();
+    try {
+      console.log(`[Backend] Auto-querying status of pending payment '${payment.id}' via provider: ${provider.name}`);
+      const check = await provider.getPaymentStatus(payment.provider_payment_id);
+      if (check && check.status) {
+        const normalized = provider.normalizeStatus(check.status);
+        if (normalized !== payment.payment_status) {
+          payment.payment_status = normalized as any;
+          payment.raw_provider_status = check.status;
+          payment.raw_provider_response = check.rawResponse;
+          payment.updated_at = new Date().toISOString();
+
+          if (normalized === 'paid') {
+            payment.settlement_status = 'settled';
+            payment.paid_at = new Date().toISOString();
+            payment.settled_at = new Date().toISOString();
+
+            // Update matching payment request status
+            const reqIndex = store.requests.findIndex(r => r.reference.toLowerCase() === payment.internal_reference.toLowerCase());
+            if (reqIndex !== -1) {
+              store.requests[reqIndex].status = 'paid';
+              store.requests[reqIndex].paid_at = new Date().toISOString();
+            }
+
+            writeAuditLog('provider', provider.name, 'PAYMENT_COMPLETED', 'payment', payment.id, {
+              amount: payment.amount,
+              currency: payment.currency
+            });
+          }
+          saveStore(store);
+        }
+      }
+    } catch (err: any) {
+      console.error(`[Backend] Auto-querying status failed for '${payment.id}':`, err.message);
+    }
   }
 
   return res.json({ success: true, payment });

@@ -119,222 +119,291 @@ export default function PaymentForm({ onPaymentSuccess, presetAmount, presetRequ
   };
 
   return (
-    <section className="py-12 px-6 relative" id="ticketone-checkout-section">
-      <div className="max-w-xl mx-auto">
-        <div className="border border-white/[0.06] bg-charcoal-black rounded-xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.4)] relative">
+    <div className="w-full relative" id="ticketone-checkout-section">
+      {/* 1. UPPER SECTION: Deep Teal Brand Color */}
+      <div className="w-full bg-primary-navy pt-20 pb-32 relative overflow-hidden text-center">
+        {/* Subtle, elegant vector patterns or radial lights for background luxury */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(209,232,226,0.08)_0%,transparent_70%)] pointer-events-none" />
+        
+        <div className="max-w-4xl mx-auto px-6 relative z-10 space-y-3">
+          <motion.h3 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="font-serif text-3xl sm:text-4xl lg:text-5xl text-softivory font-light tracking-wide"
+          >
+            Private Advisory Payment
+          </motion.h3>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+            className="text-sm sm:text-base text-softivory/80 max-w-xl mx-auto font-light leading-relaxed"
+          >
+            Confidential, secure payment processing for advisory engagements.
+          </motion.p>
+        </div>
+
+        {/* 1b. CURVED DIVIDER WITH GOLD LINE */}
+        <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-none z-10 translate-y-[2px]">
+          <svg className="relative block w-full h-[48px] sm:h-[64px]" viewBox="0 0 1440 120" preserveAspectRatio="none">
+            {/* Elegant gold accent line */}
+            <path d="M0,60 Q720,120 1440,60 L1440,65 Q720,125 0,65 Z" fill="#D9B08C" opacity="0.95"></path>
+            {/* Pure white fill below */}
+            <path d="M0,64 Q720,124 1440,64 L1440,120 L0,120 Z" fill="#FFFFFF"></path>
+          </svg>
+        </div>
+      </div>
+
+      {/* 2. LOWER SECTION: Pure White */}
+      <div className="w-full bg-white pt-16 pb-24 px-4 sm:px-6 relative text-charcoal-black">
+        <div className="max-w-xl mx-auto">
           
-          {/* subtle golden border highlight top */}
-          <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-muted-gold/40 to-transparent" />
+          {/* THE DARK PREMIUM PAYMENT CARD */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="border border-[#D9B08C]/15 bg-charcoal-black rounded-2xl p-6 sm:p-10 shadow-[0_25px_60px_rgba(44,53,49,0.18)] relative"
+          >
+            {/* subtle golden border highlight top */}
+            <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[#D9B08C]/40 to-transparent" />
 
-          <div className="mb-6 text-center">
-            <h3 className="font-serif text-2xl text-softivory font-light tracking-wide">
-              Dedicated Advisory Payment Portal
-            </h3>
-            <p className="text-xs text-cool-grey mt-2">
-              Confidential, secure, 256-bit SSL encrypted connection
-            </p>
-          </div>
-
-          <form onSubmit={handleInitPay} className="space-y-5">
-            {presetRequest?.description && (
-              <div className="bg-primary-navy/40 border border-muted-gold/15 p-4 rounded text-xs text-softivory/90 leading-relaxed font-light mb-4">
-                <span className="text-[10px] font-mono uppercase text-muted-gold block mb-1 tracking-wider font-semibold">ADVISORY SERVICE SCOPE</span>
-                {presetRequest.description}
-              </div>
-            )}
-
-            {/* Client Name */}
-            <div>
-              <label htmlFor="clientName" className="block text-[11px] font-mono tracking-wider text-cool-grey uppercase mb-1.5 font-medium">
-                Client Legal Name
-              </label>
-              <input
-                id="clientName"
-                type="text"
-                value={clientName}
-                onChange={e => {
-                  if (isLocked) return;
-                  setClientName(e.target.value);
-                  if (formErrors.clientName) {
-                    setFormErrors(prev => ({ ...prev, clientName: '' }));
-                  }
-                }}
-                disabled={isLocked}
-                placeholder="Lord Arthur Wellesley"
-                className={`w-full bg-primary-navy/40 border ${
-                  formErrors.clientName ? 'border-red-500/50 focus:border-red-500' : 'border-white/[0.1] focus:border-muted-gold/50'
-                } rounded px-4 py-3 text-sm text-softivory placeholder-cool-grey/30 focus:outline-none transition-all ${
-                  isLocked ? 'opacity-70 cursor-not-allowed border-white/[0.04]' : ''
-                }`}
-              />
-              {formErrors.clientName && (
-                <span className="text-[11px] text-red-400 font-mono mt-1 block">{formErrors.clientName}</span>
+            <form onSubmit={handleInitPay} className="space-y-6">
+              {presetRequest?.description && (
+                <div className="bg-primary-navy/30 border border-[#D9B08C]/20 p-4.5 rounded-lg text-xs text-softivory/95 leading-relaxed font-light mb-2">
+                  <span className="text-[10px] font-mono uppercase text-[#D9B08C] block mb-1 tracking-wider font-semibold">ADVISORY SERVICE SCOPE</span>
+                  {presetRequest.description}
+                </div>
               )}
-            </div>
 
-            {/* Email Address */}
-            <div>
-              <label htmlFor="email" className="block text-[11px] font-mono tracking-wider text-cool-grey uppercase mb-1.5 font-medium">
-                Confidential Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={e => {
-                  if (isLocked) return;
-                  setEmail(e.target.value);
-                  if (formErrors.email) {
-                    setFormErrors(prev => ({ ...prev, email: '' }));
-                  }
-                }}
-                disabled={isLocked}
-                placeholder="a.wellesley@paramountgp.co"
-                className={`w-full bg-primary-navy/40 border ${
-                  formErrors.email ? 'border-red-500/50 focus:border-red-500' : 'border-white/[0.1] focus:border-muted-gold/50'
-                } rounded px-4 py-3 text-sm text-softivory placeholder-cool-grey/30 focus:outline-none transition-all ${
-                  isLocked ? 'opacity-70 cursor-not-allowed border-white/[0.04]' : ''
-                }`}
-              />
-              <span className="text-[10px] text-cool-grey/40 font-mono mt-1 block">
-                Your payment receipt and secure confirmation record will be sent here.
-              </span>
-              {formErrors.email && (
-                <span className="text-[11px] text-red-400 font-mono mt-1 block">{formErrors.email}</span>
-              )}
-            </div>
-
-            {/* Reference Number */}
-            <div>
-              <label htmlFor="reference" className="block text-[11px] font-mono tracking-wider text-cool-grey uppercase mb-1.5 font-medium">
-                Advisory Reference / Invoice Number {isLocked && <span className="text-muted-gold font-normal text-[10px] lowercase italic">(locked)</span>}
-              </label>
-              <input
-                id="reference"
-                type="text"
-                value={reference}
-                onChange={e => {
-                  if (isLocked) return;
-                  setReference(e.target.value);
-                  if (formErrors.reference) {
-                    setFormErrors(prev => ({ ...prev, reference: '' }));
-                  }
-                }}
-                disabled={isLocked}
-                placeholder="WHL-2026-6701X"
-                className={`w-full bg-primary-navy/40 border ${
-                  formErrors.reference ? 'border-red-500/50 focus:border-red-500' : 'border-white/[0.1] focus:border-muted-gold/50'
-                } rounded px-4 py-3 text-sm text-softivory placeholder-cool-grey/30 focus:outline-none transition-all ${
-                  isLocked ? 'opacity-70 cursor-not-allowed border-white/[0.04]' : ''
-                }`}
-              />
-              {formErrors.reference && (
-                <span className="text-[11px] text-red-400 font-mono mt-1 block">{formErrors.reference}</span>
-              )}
-            </div>
-
-            {/* Currency and Amount Row */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-1">
-                <label htmlFor="currency" className="block text-[11px] font-mono tracking-wider text-cool-grey uppercase mb-1.5 font-medium">
-                  Currency
+              {/* Client Name */}
+              <div className="space-y-1.5">
+                <label htmlFor="clientName" className="block text-[11px] tracking-wider text-cool-grey uppercase font-semibold">
+                  Client Legal Name
                 </label>
-                <select
-                  id="currency"
-                  value={currency}
+                <input
+                  id="clientName"
+                  type="text"
+                  value={clientName}
                   onChange={e => {
                     if (isLocked) return;
-                    setCurrency(e.target.value);
+                    setClientName(e.target.value);
+                    if (formErrors.clientName) {
+                      setFormErrors(prev => ({ ...prev, clientName: '' }));
+                    }
                   }}
                   disabled={isLocked}
-                  className={`w-full bg-primary-navy/40 border border-white/[0.1] rounded px-3 py-3 text-sm text-softivory focus:border-muted-gold/50 focus:outline-none transition-all ${
-                    isLocked ? 'opacity-70 cursor-not-allowed border-white/[0.04]' : ''
+                  placeholder="Lord Arthur Wellesley"
+                  className={`w-full bg-[#1e2523] border ${
+                    formErrors.clientName ? 'border-red-500/50 focus:border-red-500' : 'border-white/[0.08] focus:border-[#D9B08C]/50'
+                  } rounded-lg px-4 py-3.5 text-sm text-softivory placeholder-cool-grey/25 focus:outline-none transition-all ${
+                    isLocked ? 'opacity-75 cursor-not-allowed border-white/[0.04]' : ''
                   }`}
-                >
-                  <option value="USD" className="bg-primary-navy">USD ($)</option>
-                  <option value="EUR" className="bg-primary-navy">EUR (€)</option>
-                  <option value="GBP" className="bg-primary-navy">GBP (£)</option>
-                  <option value="CHF" className="bg-primary-navy">CHF (Fr.)</option>
-                </select>
+                />
+                {formErrors.clientName && (
+                  <span className="text-[11px] text-red-400 font-mono mt-1 block">{formErrors.clientName}</span>
+                )}
               </div>
 
-              <div className="col-span-2">
-                <label htmlFor="amount" className="block text-[11px] font-mono tracking-wider text-cool-grey uppercase mb-1.5 font-medium">
-                  Advisory Retainer Fee Amount {isLocked && <span className="text-muted-gold font-normal text-[10px] lowercase italic">(locked)</span>}
+              {/* Email Address */}
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="block text-[11px] tracking-wider text-cool-grey uppercase font-semibold">
+                  Confidential Email Address
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <span className="text-cool-grey/60 font-mono text-sm">
-                      {CURRENCY_SYMBOLS[currency]}
-                    </span>
-                  </div>
-                  <input
-                    id="amount"
-                    type="number"
-                    value={amount}
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={e => {
+                    if (isLocked) return;
+                    setEmail(e.target.value);
+                    if (formErrors.email) {
+                      setFormErrors(prev => ({ ...prev, email: '' }));
+                    }
+                  }}
+                  disabled={isLocked}
+                  placeholder="a.wellesley@paramountgp.co"
+                  className={`w-full bg-[#1e2523] border ${
+                    formErrors.email ? 'border-red-500/50 focus:border-red-500' : 'border-white/[0.08] focus:border-[#D9B08C]/50'
+                  } rounded-lg px-4 py-3.5 text-sm text-softivory placeholder-cool-grey/25 focus:outline-none transition-all ${
+                    isLocked ? 'opacity-75 cursor-not-allowed border-white/[0.04]' : ''
+                  }`}
+                />
+                <p className="text-[10px] text-cool-grey/40 leading-relaxed">
+                  Your payment receipt and secure confirmation record will be sent here.
+                </p>
+                {formErrors.email && (
+                  <span className="text-[11px] text-red-400 font-mono mt-1 block">{formErrors.email}</span>
+                )}
+              </div>
+
+              {/* Reference Number */}
+              <div className="space-y-1.5">
+                <label htmlFor="reference" className="block text-[11px] tracking-wider text-cool-grey uppercase font-semibold">
+                  Advisory Reference / Invoice Number {isLocked && <span className="text-[#D9B08C] font-normal text-[10px] lowercase italic">(locked)</span>}
+                </label>
+                <input
+                  id="reference"
+                  type="text"
+                  value={reference}
+                  onChange={e => {
+                    if (isLocked) return;
+                    setReference(e.target.value);
+                    if (formErrors.reference) {
+                      setFormErrors(prev => ({ ...prev, reference: '' }));
+                    }
+                  }}
+                  disabled={isLocked}
+                  placeholder="WHL-2026-6701X"
+                  className={`w-full bg-[#1e2523] border ${
+                    formErrors.reference ? 'border-red-500/50 focus:border-red-500' : 'border-white/[0.08] focus:border-[#D9B08C]/50'
+                  } rounded-lg px-4 py-3.5 text-sm text-softivory placeholder-cool-grey/25 focus:outline-none transition-all ${
+                    isLocked ? 'opacity-75 cursor-not-allowed border-white/[0.04]' : ''
+                  }`}
+                />
+                {formErrors.reference && (
+                  <span className="text-[11px] text-red-400 font-mono mt-1 block">{formErrors.reference}</span>
+                )}
+              </div>
+
+              {/* Currency and Amount Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-1 space-y-1.5">
+                  <label htmlFor="currency" className="block text-[11px] tracking-wider text-cool-grey uppercase font-semibold">
+                    Currency
+                  </label>
+                  <select
+                    id="currency"
+                    value={currency}
                     onChange={e => {
                       if (isLocked) return;
-                      setAmount(e.target.value);
-                      if (formErrors.amount) {
-                        setFormErrors(prev => ({ ...prev, amount: '' }));
-                      }
+                      setCurrency(e.target.value);
                     }}
                     disabled={isLocked}
-                    placeholder="25000"
-                    min="1"
-                    className={`w-full bg-primary-navy/40 border ${
-                      formErrors.amount ? 'border-red-500/50 focus:border-red-500' : 'border-white/[0.1] focus:border-muted-gold/50'
-                    } rounded pl-8 pr-4 py-3 text-sm text-softivory placeholder-cool-grey/30 focus:outline-none transition-all font-mono ${
-                      isLocked ? 'opacity-70 cursor-not-allowed border-white/[0.04]' : ''
+                    className={`w-full bg-[#1e2523] border border-white/[0.08] rounded-lg px-3 py-3.5 text-sm text-softivory focus:border-[#D9B08C]/50 focus:outline-none transition-all ${
+                      isLocked ? 'opacity-75 cursor-not-allowed border-white/[0.04]' : ''
                     }`}
-                  />
+                  >
+                    <option value="USD" className="bg-[#2C3531]">USD ($)</option>
+                    <option value="EUR" className="bg-[#2C3531]">EUR (€)</option>
+                    <option value="GBP" className="bg-[#2C3531]">GBP (£)</option>
+                    <option value="CHF" className="bg-[#2C3531]">CHF (Fr.)</option>
+                  </select>
                 </div>
-                {formErrors.amount && (
-                  <span className="text-[11px] text-red-400 font-mono mt-1 block">{formErrors.amount}</span>
-                )}
+
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label htmlFor="amount" className="block text-[11px] tracking-wider text-cool-grey uppercase font-semibold">
+                    Advisory Retainer Fee Amount {isLocked && <span className="text-[#D9B08C] font-normal text-[10px] lowercase italic">(locked)</span>}
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <span className="text-cool-grey/60 text-sm">
+                        {CURRENCY_SYMBOLS[currency]}
+                      </span>
+                    </div>
+                    <input
+                      id="amount"
+                      type="number"
+                      value={amount}
+                      onChange={e => {
+                        if (isLocked) return;
+                        setAmount(e.target.value);
+                        if (formErrors.amount) {
+                          setFormErrors(prev => ({ ...prev, amount: '' }));
+                        }
+                      }}
+                      disabled={isLocked}
+                      placeholder="25000"
+                      min="1"
+                      className={`w-full bg-[#1e2523] border ${
+                        formErrors.amount ? 'border-red-500/50 focus:border-red-500' : 'border-white/[0.08] focus:border-[#D9B08C]/50'
+                      } rounded-lg pl-8 pr-4 py-3.5 text-sm text-softivory placeholder-cool-grey/25 focus:outline-none transition-all ${
+                        isLocked ? 'opacity-75 cursor-not-allowed border-white/[0.04]' : ''
+                      }`}
+                    />
+                  </div>
+                  {formErrors.amount && (
+                    <span className="text-[11px] text-red-400 font-mono mt-1 block">{formErrors.amount}</span>
+                  )}
+                </div>
+              </div>
+
+              {apiError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-4 rounded-lg font-mono mb-4 flex items-start gap-2">
+                  <span className="shrink-0">⚠️</span>
+                  <div>
+                    <span className="font-semibold block mb-0.5">Payment Exception</span>
+                    {apiError}
+                  </div>
+                </div>
+              )}
+
+              {/* Pay Now Button */}
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  id="submit-pay-form-btn"
+                  disabled={isRedirecting}
+                  className="w-full bg-[#D9B08C] hover:bg-[#cbb27a] disabled:bg-[#D9B08C]/40 text-[#2C3531] font-semibold uppercase tracking-wider text-xs sm:text-sm py-4 px-6 rounded-lg transition-all duration-300 transform active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 hover:shadow-lg shadow-[#D9B08C]/10"
+                >
+                  {isRedirecting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Preparing secure checkout...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4" />
+                      <span>Confirm &amp; Proceed to Secure Checkout</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="pt-4 text-center border-t border-white/[0.04]">
+                <p className="text-[11px] sm:text-xs text-cool-grey/60 leading-relaxed max-w-md mx-auto">
+                  You will be redirected to our secure payment partner to complete your card payment. Ticketone does not store card details.
+                </p>
+              </div>
+            </form>
+          </motion.div>
+
+          {/* ACCEPTED PAYMENT METHODS SECTION */}
+          <div className="mt-14 text-center space-y-4">
+            <h4 className="text-xs uppercase tracking-widest text-[#2C3531]/60 font-semibold">
+              Accepted Payment Methods
+            </h4>
+            
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {/* AMEX */}
+              <div className="bg-[#0070d3] text-white border border-[#005fb3] rounded-md px-2 py-1 h-8 w-14 flex flex-col items-center justify-center select-none shadow-sm">
+                <span className="font-sans font-black text-[10px] tracking-tighter leading-none">AM</span>
+                <span className="font-sans font-black text-[10px] tracking-tighter leading-none">EX</span>
+              </div>
+
+              {/* Discover */}
+              <div className="bg-white border border-gray-300 rounded-md px-2 py-1 h-8 w-14 flex items-center justify-center select-none shadow-sm">
+                <span className="font-sans font-extrabold text-[#3b3b3b] text-[8px] tracking-tighter">DISC<span className="text-[#f15a24] font-black">O</span>VER</span>
+              </div>
+
+              {/* Mastercard */}
+              <div className="bg-[#1f1f1f] border border-[#3a3a3a] rounded-md px-2 py-1 h-8 w-14 flex items-center justify-center gap-0.5 select-none shadow-sm">
+                <div className="flex -space-x-1.5">
+                  <div className="w-4 h-4 rounded-full bg-[#f91c1c] opacity-95"></div>
+                  <div className="w-4 h-4 rounded-full bg-[#ff9900] mix-blend-screen"></div>
+                </div>
+              </div>
+
+              {/* Visa */}
+              <div className="bg-[#0f172a] text-white border border-[#334155] rounded-md px-2 py-1 h-8 w-14 flex items-center justify-center select-none shadow-sm">
+                <span className="font-sans font-extrabold italic text-[10px] tracking-wider text-[#f59e0b]">VISA</span>
               </div>
             </div>
 
-            {apiError && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-4 rounded font-mono mb-4 flex items-start gap-2">
-                <span className="shrink-0">⚠️</span>
-                <div>
-                  <span className="font-semibold block mb-0.5">Secure Gateway Exception</span>
-                  {apiError}
-                </div>
-              </div>
-            )}
-
-            {/* Pay Now Button */}
-            <div className="pt-4">
-              <button
-                type="submit"
-                id="submit-pay-form-btn"
-                disabled={isRedirecting}
-                className="w-full bg-muted-gold hover:bg-[#cbb27a] disabled:bg-muted-gold/40 text-charcoal-black font-semibold uppercase tracking-widest text-xs py-4 px-6 rounded transition-all duration-300 transform active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
-              >
-                {isRedirecting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Contacting global payment node...</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="h-4 w-4" />
-                    <span>Confirm &amp; Proceed to Secure checkout</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="pt-3 flex items-center justify-between text-[11px] text-cool-grey/55 font-mono border-t border-white/[0.04]">
-              <span className="flex items-center gap-1">
-                <ShieldCheck className="h-3.5 w-3.5 text-muted-gold" />
-                <span>Strict Security Gateway</span>
-              </span>
-              <span>Global Payment Provider Node</span>
-            </div>
-          </form>
+            <p className="text-[11px] text-[#2C3531]/50 font-sans">
+              Major cards accepted through our designated global payment partner.
+            </p>
+          </div>
 
         </div>
       </div>
@@ -361,10 +430,10 @@ export default function PaymentForm({ onPaymentSuccess, presetAmount, presetRequ
 
               <div className="space-y-2">
                 <h4 className="font-serif text-lg text-softivory font-light tracking-wide">
-                  Establishing Handshake
+                  Preparing Secure Checkout
                 </h4>
                 <p className="text-xs text-cool-grey leading-relaxed">
-                  Connecting to our secure global checkout partner to initiate your confidential retainer transaction...
+                  Redirecting you to our secure payment partner to complete your confidential transaction...
                 </p>
               </div>
 
@@ -379,12 +448,12 @@ export default function PaymentForm({ onPaymentSuccess, presetAmount, presetRequ
 
               <div className="flex items-center gap-2 justify-center py-2.5 px-3 rounded bg-white/[0.02] border border-white/[0.04] text-[10px] text-cool-grey/60 font-mono">
                 <ShieldCheck className="h-3.5 w-3.5 text-success-green" />
-                <span>PCI-DSS Compliant Connection Shielded</span>
+                <span>Confidential Connection Secured</span>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </section>
+    </div>
   );
 }
