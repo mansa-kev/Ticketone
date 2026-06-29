@@ -2,7 +2,6 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { getActiveProvider } from './providers';
 
 // Load environment variables from .env if present
@@ -194,7 +193,12 @@ const INITIAL_STORE: DBStore = {
   audit_logs: []
 };
 
+let memoryStore: DBStore | null = null;
+
 function getStore(): DBStore {
+  if (memoryStore) {
+    return memoryStore;
+  }
   try {
     if (fs.existsSync(DB_STORE_PATH)) {
       const data = fs.readFileSync(DB_STORE_PATH, 'utf-8');
@@ -206,16 +210,19 @@ function getStore(): DBStore {
       if (!store.webhooks) store.webhooks = [];
       if (!store.receipts) store.receipts = [];
       if (!store.audit_logs) store.audit_logs = [];
+      memoryStore = store;
       return store;
     }
   } catch (err) {
     console.error('Error reading db_store.json, using initial store:', err);
   }
-  saveStore(INITIAL_STORE);
-  return INITIAL_STORE;
+  memoryStore = { ...INITIAL_STORE };
+  saveStore(memoryStore);
+  return memoryStore;
 }
 
 function saveStore(store: DBStore): void {
+  memoryStore = store;
   try {
     fs.writeFileSync(DB_STORE_PATH, JSON.stringify(store, null, 2), 'utf-8');
   } catch (err) {
@@ -873,6 +880,7 @@ app.post('/api/admin/notes', (req, res) => {
 // --- VITE MIDDLEWARE CONFIGURATION ---
 async function initServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
