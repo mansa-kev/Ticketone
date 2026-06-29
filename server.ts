@@ -9,6 +9,7 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://pay.owlenix.com';
 const DB_STORE_PATH = process.env.VERCEL
   ? path.join('/tmp', 'db_store.json')
   : path.join(process.cwd(), 'db_store.json');
@@ -135,13 +136,13 @@ const INITIAL_STORE: DBStore = {
       internal_reference: "INV-2026-089A",
       invoice_reference: "INV-2026-089A",
       payment_reference: "INV-2026-089A",
-      provider_name: "stripe",
-      payment_provider: "stripe",
-      provider_payment_id: "ch_3M2h6cK9Z0d2L8k",
-      provider_checkout_url: "https://checkout.stripe.com/pay/94021",
+      provider_name: "nowpayments",
+      payment_provider: "nowpayments",
+      provider_payment_id: "invoice_6cK9Z0d2L8k",
+      provider_checkout_url: "https://nowpayments.io/payment/invoice/6cK9Z0d2L8k",
       payment_status: "paid",
       settlement_status: "settled",
-      payment_method: "Stripe Premium Card Node",
+      payment_method: "NOWPayments Crypto Settlement Node",
       created_at: "2026-06-22T14:30:00Z",
       paid_at: "2026-06-22T14:35:00Z",
       settled_at: "2026-06-22T15:00:00Z",
@@ -158,13 +159,13 @@ const INITIAL_STORE: DBStore = {
       internal_reference: "INV-2026-091B",
       invoice_reference: "INV-2026-091B",
       payment_reference: "INV-2026-091B",
-      provider_name: "paypal",
-      payment_provider: "paypal",
-      provider_payment_id: "ch_3M2h6cK9Z0d2L9x",
-      provider_checkout_url: "https://paypal.com/checkout/48902",
+      provider_name: "nowpayments",
+      payment_provider: "nowpayments",
+      provider_payment_id: "invoice_6cK9Z0d2L9x",
+      provider_checkout_url: "https://nowpayments.io/payment/invoice/6cK9Z0d2L9x",
       payment_status: "paid",
       settlement_status: "settled",
-      payment_method: "PayPal Wire Transfer Node",
+      payment_method: "NOWPayments Crypto Settlement Node",
       created_at: "2026-06-20T09:15:00Z",
       paid_at: "2026-06-20T09:30:00Z",
       settled_at: "2026-06-20T11:45:00Z",
@@ -181,7 +182,7 @@ const INITIAL_STORE: DBStore = {
       description: "Structured Sovereign Bond Portfolios Placement Setup Fee",
       reference: "INV-2026-112B",
       payment_link_token: "INV-2026-112B",
-      payment_link: "http://localhost:3000/?ref=INV-2026-112B",
+      payment_link: `${APP_URL}/?ref=INV-2026-112B`,
       status: "unpaid",
       expires_at: "2026-07-30T10:00:00Z",
       created_at: "2026-06-22T09:00:00Z"
@@ -296,10 +297,10 @@ app.post('/api/payments/create', async (req, res) => {
   const now = new Date().toISOString();
 
   // Load the selected dynamic provider via abstraction layer
-  const provider = getActiveProvider();
-  console.log(`[Backend] Creating payment via dynamic provider: ${provider.name}`);
-
   try {
+    const provider = getActiveProvider();
+    console.log(`[Backend] Creating payment via dynamic provider: ${provider.name}`);
+
     const providerRes = await provider.createPayment({
       client_name,
       client_email,
@@ -327,13 +328,7 @@ app.post('/api/payments/create', async (req, res) => {
       provider_checkout_url: providerRes.checkoutUrl,
       payment_status: 'pending',
       settlement_status: 'awaiting settlement',
-      payment_method: provider.name === 'binancepay' 
-        ? 'Binance Pay Wallet' 
-        : provider.name === 'nowpayments' 
-          ? 'NOWPayments Crypto Portal' 
-          : provider.name === 'paypal' 
-            ? 'PayPal Express Node' 
-            : 'Stripe Cards Node',
+      payment_method: 'NOWPayments Crypto Portal',
       raw_provider_status: 'pending',
       raw_provider_response: providerRes.rawResponse,
       settlement_asset: process.env.DEFAULT_SETTLEMENT_ASSET || 'USDT',
@@ -372,7 +367,10 @@ app.post('/api/payments/create', async (req, res) => {
     });
   } catch (err: any) {
     console.error(`[Backend] Payment provider call failure:`, err);
-    return res.status(500).json({ error: `Payment gateway initiation failed: ${err.message}` });
+    if (err.message && err.message.includes("Ticketone is configured to use NOWPayments only")) {
+      return res.status(500).json({ error: err.message });
+    }
+    return res.status(500).json({ error: "Secure checkout could not be prepared. Please contact support." });
   }
 });
 
@@ -393,7 +391,7 @@ app.get('/api/payments/status/:paymentId', async (req, res) => {
   const payment = store.payments[paymentIndex];
 
   // Dynamically verify status with active provider if currently pending and has a provider ID
-  if (payment.payment_status === 'pending' && payment.provider_payment_id && !payment.provider_payment_id.startsWith('now_sandbox_') && !payment.provider_payment_id.startsWith('stripe_sandbox_')) {
+  if (payment.payment_status === 'pending' && payment.provider_payment_id && !payment.provider_payment_id.startsWith('now_sandbox_')) {
     const provider = getActiveProvider();
     try {
       console.log(`[Backend] Auto-querying status of pending payment '${payment.id}' via provider: ${provider.name}`);
@@ -523,7 +521,7 @@ app.post('/api/webhooks/nowpayments', (req, res) => {
       payment_id: payment.id,
       receipt_number: `R-${payment.internal_reference}`,
       issued_at: now,
-      receipt_url: `http://localhost:3000/receipt/${receiptId}`,
+      receipt_url: `${APP_URL}/receipt/${receiptId}`,
       sent_to_client: true,
       created_at: now
     };
@@ -642,7 +640,7 @@ app.post('/api/webhooks/payment-provider', (req, res) => {
       payment_id: payment.id,
       receipt_number: `R-${payment.internal_reference}`,
       issued_at: now,
-      receipt_url: `http://localhost:3000/receipt/${receiptId}`,
+      receipt_url: `${APP_URL}/receipt/${receiptId}`,
       sent_to_client: true,
       created_at: now
     };
@@ -733,7 +731,7 @@ app.post('/api/admin/payment-requests', (req, res) => {
   }
 
   const id = `req_${Math.floor(1000 + Math.random() * 9000)}`;
-  const link = `http://localhost:3000/?ref=${reference}`;
+  const link = `${APP_URL}/?ref=${reference}`;
 
   const newRequest: PaymentRequest = {
     id,
@@ -774,7 +772,7 @@ app.post('/api/admin/requests/create', (req, res) => {
   }
 
   const id = `req_${Math.floor(1000 + Math.random() * 9000)}`;
-  const link = `http://localhost:3000/?ref=${reference}`;
+  const link = `${APP_URL}/?ref=${reference}`;
 
   const newRequest: PaymentRequest = {
     id,

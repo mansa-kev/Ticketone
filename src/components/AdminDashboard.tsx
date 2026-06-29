@@ -1862,7 +1862,7 @@ Restricted private corporate audit archive.
                     <label className="text-[#d1e8e2]/60 block uppercase text-[10px]">Merchant Account Connection</label>
                     <div className="px-3 py-2 bg-[#2c3531]/20 border border-white/[0.08] rounded flex items-center justify-between">
                       <span className="text-emerald-400 font-bold uppercase tracking-wider text-[10px]">● Active Node Link</span>
-                      <span className="text-white/35 text-[9px]">Stripe/Card Proxy</span>
+                      <span className="text-white/35 text-[9px]">NOWPayments API Node</span>
                     </div>
                   </div>
 

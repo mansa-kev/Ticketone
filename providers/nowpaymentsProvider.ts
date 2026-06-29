@@ -10,11 +10,24 @@ export class NOWPaymentsProvider implements PaymentProvider {
 
   async createPayment(input: PaymentProviderInput): Promise<PaymentProviderOutput> {
     const apiKey = this.getApiKey();
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
-    const baseUrl = process.env.NOWPAYMENTS_BASE_URL || 'https://api.nowpayments.io/v1';
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://pay.owlenix.com';
+    const rawBaseUrl = process.env.NOWPAYMENTS_BASE_URL || 'https://api.nowpayments.io';
+    // Clean base URL to support both with and without /v1
+    const baseUrl = rawBaseUrl.endsWith('/v1') ? rawBaseUrl : `${rawBaseUrl}/v1`;
+
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                        process.env.VERCEL === '1' || 
+                        (process.env.APP_URL && !process.env.APP_URL.includes('localhost')) ||
+                        (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost'));
+    const isSandboxMode = process.env.NOWPAYMENTS_SANDBOX_MODE !== 'false';
+    const isLiveOnly = !isSandboxMode || isProduction;
 
     if (!apiKey) {
-      console.log(`[NOWPayments] API Key missing, routing to integrated Sandbox checkout.`);
+      console.warn(`[NOWPayments] API Key missing. Live Only Mode: ${isLiveOnly}`);
+      if (isLiveOnly) {
+        throw new Error("Secure checkout could not be prepared. Please contact support.");
+      }
+      console.log(`[NOWPayments] Routing to integrated Sandbox checkout.`);
       return {
         providerPaymentId: `now_sandbox_${Math.random().toString(36).substring(2, 10)}`,
         checkoutUrl: `${appUrl}/checkout/sandbox?ref=${input.payment_reference}&provider=nowpayments`,
@@ -23,36 +36,68 @@ export class NOWPaymentsProvider implements PaymentProvider {
     }
 
     try {
+      const webhookUrl = process.env.NOWPAYMENTS_WEBHOOK_URL || `${appUrl}/api/webhooks/nowpayments`;
+      
+      let successUrl = process.env.PAYMENT_SUCCESS_URL || `${appUrl}/payment/success`;
+      if (successUrl && !successUrl.includes('ref=')) {
+        successUrl += (successUrl.includes('?') ? '&' : '?') + `ref=${input.payment_reference}`;
+      }
+
+      let cancelUrl = process.env.PAYMENT_CANCEL_URL || `${appUrl}/payment/cancelled`;
+      if (cancelUrl && !cancelUrl.includes('ref=')) {
+        cancelUrl += (cancelUrl.includes('?') ? '&' : '?') + `ref=${input.payment_reference}`;
+      }
+
+      const requestPayload = {
+        price_amount: input.amount,
+        price_currency: input.currency.toLowerCase(),
+        order_id: input.payment_reference,
+        order_description: input.description || 'Confidential Advisory Retainer Fee',
+        ipn_callback_url: webhookUrl,
+        success_url: successUrl,
+        cancel_url: cancelUrl
+      };
+
+      // Detailed server-side logging for the request (hiding keys/secrets)
+      console.log(`[NOWPayments Live API Call] Initiating payment for order ${input.payment_reference}`);
+      console.log(`[NOWPayments Live API Call] URL: ${baseUrl}/invoice`);
+      console.log(`[NOWPayments Live API Call] Payload:`, JSON.stringify(requestPayload, null, 2));
+
       const response = await fetch(`${baseUrl}/invoice`, {
         method: 'POST',
         headers: {
           'x-api-key': apiKey,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          price_amount: input.amount,
-          price_currency: input.currency.toLowerCase(),
-          order_id: input.payment_reference,
-          order_description: input.description || 'Confidential Advisory Retainer Fee',
-          ipn_callback_url: `${appUrl}/api/webhooks/nowpayments`,
-          success_url: process.env.PAYMENT_SUCCESS_URL || `${appUrl}/payment/success?ref=${input.payment_reference}`,
-          cancel_url: process.env.PAYMENT_CANCEL_URL || `${appUrl}/payment/cancelled?ref=${input.payment_reference}`
-        })
+        body: JSON.stringify(requestPayload)
       });
+
+      console.log(`[NOWPayments Live API Call] Response HTTP Status: ${response.status}`);
 
       if (!response.ok) {
         const errText = await response.text();
+        console.error(`[NOWPayments Live API Error] HTTP Status ${response.status}:`, errText);
         throw new Error(`NOWPayments API error status ${response.status}: ${errText}`);
       }
 
       const data = await response.json();
+      console.log(`[NOWPayments Live API Success] Response Payload:`, JSON.stringify(data, null, 2));
+
+      if (!data.invoice_url) {
+        console.error(`[NOWPayments Live API Error] invoice_url missing in response:`, JSON.stringify(data));
+        throw new Error('Invoice URL is missing in NOWPayments API response.');
+      }
+
       return {
         providerPaymentId: String(data.id),
         checkoutUrl: data.invoice_url,
         rawResponse: data
       };
     } catch (err: any) {
-      console.error('[NOWPayments] Failed to invoke live API, falling back to sandbox:', err.message);
+      console.error('[NOWPayments] Detailed Live API Failure:', err.message || err);
+      if (isLiveOnly) {
+        throw new Error("Secure checkout could not be prepared. Please contact support.");
+      }
       return {
         providerPaymentId: `now_err_fallback_${Math.random().toString(36).substring(2, 10)}`,
         checkoutUrl: `${appUrl}/checkout/sandbox?ref=${input.payment_reference}&provider=nowpayments&error=live_api_failed`,
@@ -63,7 +108,8 @@ export class NOWPaymentsProvider implements PaymentProvider {
 
   async getPaymentStatus(providerPaymentId: string): Promise<{ status: string; rawResponse: any }> {
     const apiKey = this.getApiKey();
-    const baseUrl = process.env.NOWPAYMENTS_BASE_URL || 'https://api.nowpayments.io/v1';
+    const rawBaseUrl = process.env.NOWPAYMENTS_BASE_URL || 'https://api.nowpayments.io';
+    const baseUrl = rawBaseUrl.endsWith('/v1') ? rawBaseUrl : `${rawBaseUrl}/v1`;
 
     if (!apiKey || providerPaymentId.startsWith('now_sandbox_')) {
       return { status: 'paid', rawResponse: { mode: 'sandbox' } };
