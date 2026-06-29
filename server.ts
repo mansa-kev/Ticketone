@@ -10,7 +10,9 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
-const DB_STORE_PATH = path.join(process.cwd(), 'db_store.json');
+const DB_STORE_PATH = process.env.VERCEL
+  ? path.join('/tmp', 'db_store.json')
+  : path.join(process.cwd(), 'db_store.json');
 
 app.use(express.json());
 
@@ -892,6 +894,10 @@ async function initServer() {
   });
 }
 
-initServer().catch(err => {
-  console.error('Failed to bootstrap Ticketone gateway node:', err);
-});
+if (!process.env.VERCEL) {
+  initServer().catch(err => {
+    console.error('Failed to bootstrap Ticketone gateway node:', err);
+  });
+}
+
+export default app;
