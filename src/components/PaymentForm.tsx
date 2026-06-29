@@ -99,8 +99,17 @@ export default function PaymentForm({ onPaymentSuccess, presetAmount, presetRequ
         });
 
         if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Server rejected payment initiation.');
+          let errMsg = 'Server rejected payment initiation.';
+          try {
+            const errData = await response.json();
+            errMsg = errData.error || errMsg;
+          } catch {
+            try {
+              const txt = await response.text();
+              errMsg = txt || errMsg;
+            } catch {}
+          }
+          throw new Error(errMsg);
         }
 
         const data = await response.json();

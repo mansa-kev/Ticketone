@@ -76,8 +76,17 @@ export default function ClientPay({ token }: ClientPayProps) {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Server rejected payment handshake.');
+        let errMsg = 'Server rejected payment handshake.';
+        try {
+          const errData = await response.json();
+          errMsg = errData.error || errMsg;
+        } catch {
+          try {
+            const txt = await response.text();
+            errMsg = txt || errMsg;
+          } catch {}
+        }
+        throw new Error(errMsg);
       }
 
       const data = await response.json();
