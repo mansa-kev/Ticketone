@@ -277,8 +277,12 @@ app.post('/api/payments/create', async (req, res) => {
 
   const store = getStore();
 
-  // Check for duplicate payment references
-  const duplicateIndex = store.payments.findIndex(p => p.internal_reference.toLowerCase() === payment_reference.toLowerCase());
+  // Check for duplicate payment references with safe string coercion
+  const refStr = String(payment_reference).toLowerCase();
+  const duplicateIndex = store.payments.findIndex(p => {
+    const internalRef = p.internal_reference ? String(p.internal_reference).toLowerCase() : '';
+    return internalRef === refStr;
+  });
   if (duplicateIndex !== -1) {
     const duplicate = store.payments[duplicateIndex];
     if (duplicate.payment_status === 'paid') {
