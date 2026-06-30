@@ -15,94 +15,159 @@ export class NOWPaymentsProvider implements PaymentProvider {
     // Clean base URL to support both with and without /v1
     const baseUrl = rawBaseUrl.endsWith('/v1') ? rawBaseUrl : `${rawBaseUrl}/v1`;
 
-    const isProduction = process.env.NODE_ENV === 'production' || 
-                        process.env.VERCEL === '1' || 
-                        (process.env.APP_URL && !process.env.APP_URL.includes('localhost')) ||
-                        (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost'));
-    const isSandboxMode = process.env.NOWPAYMENTS_SANDBOX_MODE !== 'false';
-    const isLiveOnly = !isSandboxMode || isProduction;
-
     if (!apiKey) {
-      console.warn(`[NOWPayments] API Key missing. Live Only Mode: ${isLiveOnly}`);
-      if (isLiveOnly) {
-        throw new Error("Secure checkout could not be prepared. Please contact support.");
-      }
-      console.log(`[NOWPayments] Routing to integrated Sandbox checkout.`);
-      return {
-        providerPaymentId: `now_sandbox_${Math.random().toString(36).substring(2, 10)}`,
-        checkoutUrl: `${appUrl}/checkout/sandbox?ref=${input.payment_reference}&provider=nowpayments`,
-        rawResponse: { mode: 'sandbox', input }
-      };
+      console.error("[NOWPayments] NOWPAYMENTS_API_KEY environment variable is missing.");
+      throw new Error("Card checkout is not enabled for this merchant account. Please activate NOWPayments fiat on-ramp/card payments.");
     }
 
-    try {
-      const webhookUrl = process.env.NOWPAYMENTS_WEBHOOK_URL || `${appUrl}/api/webhooks/nowpayments`;
-      
-      let successUrl = process.env.PAYMENT_SUCCESS_URL || `${appUrl}/payment/success`;
-      if (successUrl && !successUrl.includes('ref=')) {
-        successUrl += (successUrl.includes('?') ? '&' : '?') + `ref=${input.payment_reference}`;
+    const paymentMode = process.env.PAYMENT_MODE || 'card_fiat_onramp';
+    console.log(`[NOWPayments] createPayment invoked. Mode: ${paymentMode}`);
+
+    const webhookUrl = process.env.NOWPAYMENTS_WEBHOOK_URL || `${appUrl}/api/webhooks/nowpayments`;
+    
+    let successUrl = process.env.PAYMENT_SUCCESS_URL || `${appUrl}/payment/success`;
+    if (successUrl && !successUrl.includes('ref=')) {
+      successUrl += (successUrl.includes('?') ? '&' : '?') + `ref=${input.payment_reference}`;
+    }
+
+    let cancelUrl = process.env.PAYMENT_CANCEL_URL || `${appUrl}/payment/cancelled`;
+    if (cancelUrl && !cancelUrl.includes('ref=')) {
+      cancelUrl += (cancelUrl.includes('?') ? '&' : '?') + `ref=${input.payment_reference}`;
+    }
+
+    if (paymentMode === 'crypto_deposit') {
+      // Standard crypto deposit invoice flow
+      try {
+        const requestPayload = {
+          price_amount: input.amount,
+          price_currency: input.currency.toLowerCase(),
+          order_id: input.payment_reference,
+          order_description: input.description || 'Ticketone Crypto Invoice Payment',
+          ipn_callback_url: webhookUrl,
+          success_url: successUrl,
+          cancel_url: cancelUrl
+        };
+
+        console.log(`[NOWPayments Crypto Invoice API Call] Initiating payment for order ${input.payment_reference}`);
+        console.log(`[NOWPayments Crypto Invoice API Call] URL: ${baseUrl}/invoice`);
+
+        const response = await fetch(`${baseUrl}/invoice`, {
+          method: 'POST',
+          headers: {
+            'x-api-key': apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestPayload)
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`[NOWPayments Crypto Invoice API Error] HTTP Status ${response.status}:`, errText);
+          throw new Error(`NOWPayments API error status ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+        console.log(`[NOWPayments Crypto Invoice API Success] Response:`, JSON.stringify(data, null, 2));
+
+        if (!data.invoice_url) {
+          throw new Error('Invoice URL is missing in NOWPayments API response.');
+        }
+
+        return {
+          providerPaymentId: String(data.id),
+          checkoutUrl: data.invoice_url,
+          rawResponse: data
+        };
+      } catch (err: any) {
+        console.error('[NOWPayments Crypto Invoice] Live API Failure:', err.message || err);
+        throw new Error("Secure checkout could not be prepared. Please contact support.");
+      }
+    } else {
+      // paymentMode = "card_fiat_onramp"
+      const payoutAddress = process.env.DEFAULT_SETTLEMENT_ADDRESS;
+      if (!payoutAddress) {
+        console.error("[NOWPayments] DEFAULT_SETTLEMENT_ADDRESS is missing. Cannot proceed with fiat on-ramp.");
+        throw new Error("Card checkout is not enabled for this merchant account. Please activate NOWPayments fiat on-ramp/card payments.");
       }
 
-      let cancelUrl = process.env.PAYMENT_CANCEL_URL || `${appUrl}/payment/cancelled`;
-      if (cancelUrl && !cancelUrl.includes('ref=')) {
-        cancelUrl += (cancelUrl.includes('?') ? '&' : '?') + `ref=${input.payment_reference}`;
+      const settlementAsset = (process.env.DEFAULT_SETTLEMENT_ASSET || 'usdt').toLowerCase();
+      const settlementNetwork = (process.env.DEFAULT_SETTLEMENT_NETWORK || 'trc20').toLowerCase();
+      
+      // Construct pay_currency: usdttrc20, usdtarbitrum, etc.
+      let payCurrency = settlementAsset;
+      if (settlementNetwork !== 'mainnet' && settlementNetwork !== 'ethereum') {
+        payCurrency += settlementNetwork;
       }
 
       const requestPayload = {
-        price_amount: input.amount,
-        price_currency: input.currency.toLowerCase(),
+        fiat_amount: input.amount,
+        fiat_currency: input.currency.toLowerCase(),
+        pay_currency: payCurrency,
+        payout_address: payoutAddress,
         order_id: input.payment_reference,
-        order_description: input.description || 'Confidential Advisory Retainer Fee',
+        order_description: input.description || 'Ticketone Professional Fiat Payment',
         ipn_callback_url: webhookUrl,
         success_url: successUrl,
         cancel_url: cancelUrl
       };
 
-      // Detailed server-side logging for the request (hiding keys/secrets)
-      console.log(`[NOWPayments Live API Call] Initiating payment for order ${input.payment_reference}`);
-      console.log(`[NOWPayments Live API Call] URL: ${baseUrl}/invoice`);
-      console.log(`[NOWPayments Live API Call] Payload:`, JSON.stringify(requestPayload, null, 2));
+      console.log(`[NOWPayments Fiat On-Ramp API Call] Initiating payment for order ${input.payment_reference}`);
+      console.log(`[NOWPayments Fiat On-Ramp API Call] URL: ${baseUrl}/fiat-payment`);
+      console.log(`[NOWPayments Fiat On-Ramp API Call] Payload (keys/secrets hidden):`, JSON.stringify({
+        ...requestPayload,
+        payout_address: payoutAddress.substring(0, 6) + '...' + payoutAddress.substring(payoutAddress.length - 4)
+      }, null, 2));
 
-      const response = await fetch(`${baseUrl}/invoice`, {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestPayload)
-      });
+      try {
+        const response = await fetch(`${baseUrl}/fiat-payment`, {
+          method: 'POST',
+          headers: {
+            'x-api-key': apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestPayload)
+        });
 
-      console.log(`[NOWPayments Live API Call] Response HTTP Status: ${response.status}`);
+        console.log(`[NOWPayments Fiat On-Ramp API Call] Response HTTP Status: ${response.status}`);
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error(`[NOWPayments Live API Error] HTTP Status ${response.status}:`, errText);
-        throw new Error(`NOWPayments API error status ${response.status}: ${errText}`);
-      }
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`[NOWPayments Fiat On-Ramp API Error] HTTP Status ${response.status}:`, errText);
+          
+          // Show configuration error if status is 403 or if the message specifies lack of activation
+          throw new Error("Card checkout is not enabled for this merchant account. Please activate NOWPayments fiat on-ramp/card payments.");
+        }
 
-      const data = await response.json();
-      console.log(`[NOWPayments Live API Success] Response Payload:`, JSON.stringify(data, null, 2));
+        const data = await response.json();
+        console.log(`[NOWPayments Fiat On-Ramp API Success] Response Payload:`, JSON.stringify(data, null, 2));
 
-      if (!data.invoice_url) {
-        console.error(`[NOWPayments Live API Error] invoice_url missing in response:`, JSON.stringify(data));
-        throw new Error('Invoice URL is missing in NOWPayments API response.');
-      }
+        const checkoutUrl = data.redirect_url || data.checkout_url || data.invoice_url;
 
-      return {
-        providerPaymentId: String(data.id),
-        checkoutUrl: data.invoice_url,
-        rawResponse: data
-      };
-    } catch (err: any) {
-      console.error('[NOWPayments] Detailed Live API Failure:', err.message || err);
-      if (isLiveOnly) {
+        if (!checkoutUrl) {
+          console.error(`[NOWPayments Fiat On-Ramp] Redirect URL missing in response payload:`, JSON.stringify(data));
+          throw new Error("Card checkout is not enabled for this merchant account. Please activate NOWPayments fiat on-ramp/card payments.");
+        }
+
+        // Only redirect if it is a fiat/card checkout URL and NOT a crypto deposit page
+        const isCryptoDepositPage = checkoutUrl.includes('nowpayments.io/payment/invoice') || checkoutUrl.includes('nowpayments.io/invoice');
+        if (isCryptoDepositPage) {
+          console.error(`[NOWPayments Fiat On-Ramp] Provider returned a crypto deposit page URL instead of a fiat checkout URL: ${checkoutUrl}`);
+          throw new Error("Card checkout is not enabled for this merchant account. Please activate NOWPayments fiat on-ramp/card payments.");
+        }
+
+        return {
+          providerPaymentId: String(data.id || data.payment_id || ''),
+          checkoutUrl: checkoutUrl,
+          rawResponse: data
+        };
+      } catch (err: any) {
+        console.error('[NOWPayments Fiat On-Ramp] Detailed Live API Failure:', err.message || err);
+        // Propagate our specific merchant configuration error, otherwise generic
+        if (err.message && err.message.includes("Card checkout is not enabled")) {
+          throw err;
+        }
         throw new Error("Secure checkout could not be prepared. Please contact support.");
       }
-      return {
-        providerPaymentId: `now_err_fallback_${Math.random().toString(36).substring(2, 10)}`,
-        checkoutUrl: `${appUrl}/checkout/sandbox?ref=${input.payment_reference}&provider=nowpayments&error=live_api_failed`,
-        rawResponse: { mode: 'error_fallback', error: err.message, input }
-      };
     }
   }
 
@@ -111,8 +176,8 @@ export class NOWPaymentsProvider implements PaymentProvider {
     const rawBaseUrl = process.env.NOWPAYMENTS_BASE_URL || 'https://api.nowpayments.io';
     const baseUrl = rawBaseUrl.endsWith('/v1') ? rawBaseUrl : `${rawBaseUrl}/v1`;
 
-    if (!apiKey || providerPaymentId.startsWith('now_sandbox_')) {
-      return { status: 'paid', rawResponse: { mode: 'sandbox' } };
+    if (!apiKey) {
+      return { status: 'unknown', rawResponse: { error: 'API key missing' } };
     }
 
     try {
